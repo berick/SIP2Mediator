@@ -17,11 +17,8 @@ use strict; use warnings;
 use Locale::gettext;
 use JSON::XS;
 use SIPTunnel::Spec;
-use SIPTunnel::Spec::FixedField;
-use SIPTunnel::Spec::Field;
-use SIPTunnel::Spec::Message;
-use SIPTunnel::FixedField;
 use SIPTunnel::Field;
+use SIPTunnel::FixedField;
 
 my $json = JSON::XS->new;
 $json->ascii(1);

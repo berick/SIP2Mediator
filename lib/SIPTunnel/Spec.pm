@@ -12,13 +12,120 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # -----------------------------------------------------------------------
-package SIPTunnel::Spec;
 use strict; use warnings;
-use Locale::gettext;
 
-use SIPTunnel::Spec::FixedField;
-use SIPTunnel::Spec::Field;
-use SIPTunnel::Spec::Message;
+package SIPTunnel::Spec::FixedField;
+
+sub new {
+    my ($class, $length, $label) = @_;
+
+    my $self = {
+        length => $length, 
+        label => $label
+    };
+
+    return bless($self, $class);
+}
+
+sub length {
+    my $self = shift;
+    return $self->{length};
+}
+
+sub label {
+    my $self = shift;
+    return $self->{label};
+}
+
+
+package SIPTunnel::Spec::Field;
+
+# code => spec map of registered fields
+my %known_fields;
+
+sub new {
+    my ($class, $code, $label) = @_;
+    my $self = {
+        code => $code, 
+        label => $label
+    };
+    
+    return $known_fields{$code} = bless($self, $class);
+}
+
+sub code {
+    my $self = shift;
+    return $self->{code};
+}
+
+sub label {
+    my $self = shift;
+    return $self->{label};
+}
+
+# Returns the field spec for the given code.
+# If no such field is known, a new field is registered using the code
+# as the code and label.
+sub find_by_code {
+    my ($class, $code) = @_;
+    my $spec = $known_fields{$code};
+
+    if (!$spec) {
+        # no spec found for the given code.  This can happen when
+        # nonstandard fields are used (which is OK).  Create a new 
+        # spec using the code as the label.
+        $spec = SIPTunnel::Spec::Field->new($code, $code);
+    }
+
+    return $spec;
+}
+
+package SIPTunnel::Spec::Message;
+
+# code => spec map of registered message specs
+my %known_messages;
+
+sub new {
+    my ($class, $code, $label, $fixed_fields) = @_;
+
+    my $self = {
+        code => $code, 
+        label => $label, 
+        fixed_fields => $fixed_fields || []
+    };
+
+    return $known_messages{$code} = bless($self, $class);
+}
+
+sub code {
+    my $self = shift;
+    return $self->{code};
+}
+
+sub label {
+    my $self = shift;
+    return $self->{label};
+}
+
+sub fixed_fields {
+    my $self = shift;
+    return $self->{fixed_fields};
+}
+
+sub find_by_code {
+    my ($class, $code) = @_;
+
+    my $spec = $known_messages{$code};
+
+    # Nothing we can do with unknown message types.
+    warn "No such SIP2 message code = $code\n" unless $spec;
+
+    return $spec;
+}
+
+# - Compiled SIP Fixed Field, Field, and Message Specifications and Constants -
+package SIPTunnel::Spec;
+use Locale::gettext;
 
 my $l = Locale::gettext->domain("SIPTunnel");
 
@@ -28,6 +135,7 @@ use constant LINE_TERMINATOR   => "\r";
 use constant SOCKET_BUFSIZE    => 4096;
 use constant STRING_COLUMN_PAD => 32; # for printing/debugging 
 
+# Prepare a string value for adding to a SIP message string.
 sub sip_string {
     my $value = shift;
     $value = defined $value ? "$value" : '';
@@ -310,5 +418,5 @@ $MSpec::fee_paid_resp = $STSM->new(
     ]
 );
 
-
 1;
+

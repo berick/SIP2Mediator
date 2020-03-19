@@ -2,10 +2,6 @@
 package main;
 use strict; use warnings;
 use SIPTunnel::Spec;
-use SIPTunnel::Spec::FixedField;
-use SIPTunnel::Spec::Field;
-use SIPTunnel::Spec::Message;
-
 use SIPTunnel::FixedField;
 use SIPTunnel::Field;
 use SIPTunnel::Message;
