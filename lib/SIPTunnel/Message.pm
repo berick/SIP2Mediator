@@ -72,6 +72,8 @@ sub to_sip {
 
     $txt .= $_->to_sip for @{$self->fields};
 
+    $txt .= SIPTunnel::Spec::LINE_TERMINATOR;
+
     return $txt;
 }
 

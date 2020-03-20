@@ -39,7 +39,7 @@ sub value {
 
 sub to_sip {
     my $self = shift;
-    return $self->code . SIPTunnel::Spec::sip_string($self->value) . '|';
+    return $self->spec->code . SIPTunnel::Spec::sip_string($self->value) . '|';
 }
 
 sub to_str {

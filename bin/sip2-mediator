@@ -3,7 +3,7 @@
 use strict; use warnings;
 use SIPTunnel::Mediator;
 
-# TODO CONFIGS
+# TODO GETOPT
 my $config = {
     sip_address => '127.0.0.1',
     sip_port => 6001,
@@ -11,7 +11,8 @@ my $config = {
     http_port => 80,
     http_proto => 'http',
     http_path => '/sip2-mediator',
-    max_clients => 120
+    max_clients => 120,
+    syslog_facility => 'LOCAL0'
 };
 
 my $mediator = SIPTunnel::Mediator->new($config);
