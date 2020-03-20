@@ -12,9 +12,8 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # -----------------------------------------------------------------------
-use strict; use warnings;
-
 package SIPTunnel::Spec::FixedField;
+use strict; use warnings;
 
 sub new {
     my ($class, $length, $label) = @_;
@@ -39,6 +38,7 @@ sub label {
 
 
 package SIPTunnel::Spec::Field;
+use strict; use warnings;
 
 # code => spec map of registered fields
 my %known_fields;
@@ -81,6 +81,7 @@ sub find_by_code {
 }
 
 package SIPTunnel::Spec::Message;
+use strict; use warnings;
 
 # code => spec map of registered message specs
 my %known_messages;
@@ -125,6 +126,7 @@ sub find_by_code {
 
 # - Compiled SIP Fixed Field, Field, and Message Specifications and Constants -
 package SIPTunnel::Spec;
+use strict; use warnings;
 use Locale::gettext;
 
 my $l = Locale::gettext->domain("SIPTunnel");
@@ -146,6 +148,7 @@ sub sip_string {
 # --- Fixed Field Definitions ----------------------------------------------
 
 package FFSpec;
+use strict; use warnings;
 
 my $STSFF = 'SIPTunnel::Spec::FixedField'; # shorthand
 
@@ -193,6 +196,7 @@ $FFSpec::date_time_sync      = $STSFF->new(18, $l->get('date/time sync'));
 # --- Variable-Length Field Definitions -------------------------------------
 
 package FSpec;
+use strict; use warnings;
 
 my $STSF = 'SIPTunnel::Spec::Field'; # shorthand
 
@@ -273,6 +277,7 @@ $FSpec::check_number       = $STSF->new('RN', $l->get('check number'));
 # --- Message Definitions ---------------------------------------------------
 
 package MSpec;
+use strict; use warnings;
 
 my $STSM = 'SIPTunnel::Spec::Message'; # shorthand
 

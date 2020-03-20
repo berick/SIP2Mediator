@@ -78,15 +78,11 @@ sub to_sip {
 }
 
 # Turns a SIP string into a Message
+# Assumes the final line terminator character has been removed.
 sub from_sip {
-    my ($class, $msg_sip) = @_;
+    my ($class, $txt) = @_;
 
     my $msg = SIPTunnel::Message->new;
-
-    # strip the line separator
-    my $len = length($msg_sip) - length(SIPTunnel::Spec::LINE_TERMINATOR);
-    my $txt = substr($msg_sip, 0, $len);
-
     $msg->{spec} = SIPTunnel::Spec::Message->find_by_code(substr($txt, 0, 2));
 
     $txt = substr($txt, 2);
@@ -140,10 +136,9 @@ sub from_json {
 
     # Start with a SIP message string which contains only the 
     # message code and fixed fields.
-    my $txt = sprintf('%s%s%s',
+    my $txt = sprintf('%s%s',
         $hash->{code},
-        join('', @{$hash->{fixed_fields}}),
-        SIPTunnel::Spec::LINE_TERMINATOR
+        join('', @{$hash->{fixed_fields}})
     );
 
     my $msg = $class->from_sip($txt);

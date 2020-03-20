@@ -1,21 +1,109 @@
 #!/usr/bin/perl
 #:vim:ft=perl
+# -----------------------------------------------------------------------
+# Copyright (C) 2020 King County Library System
+# Bill Erickson <berickxx@gmail.com>
+# 
+# This program is free software; you can redistribute it and/or
+# modify it under the terms of the GNU General Public License
+# as published by the Free Software Foundation; either version 2
+# of the License, or (at your option) any later version.
+# 
+# This program is distributed in the hope that it will be useful,
+# but WITHOUT ANY WARRANTY; without even the implied warranty of
+# MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+# GNU General Public License for more details.
+# -----------------------------------------------------------------------
 use strict; use warnings;
+use POSIX;
+use Getopt::Long;
 use SIPTunnel::Mediator;
 
-# TODO GETOPT
-my $config = {
-    sip_address => '127.0.0.1',
-    sip_port => 6001,
-    http_address => '10.0.0.58',
-    http_port => 80,
-    http_proto => 'http',
-    http_path => '/sip2-mediator',
-    max_clients => 120,
-    syslog_facility => 'LOCAL0'
-};
+my $sip_address     = '127.0.0.1';
+my $sip_port        = 6001;
+my $http_host       = '10.0.0.58';
+my $http_port       = 80;
+my $http_proto      = 'http';
+my $http_path       = '/sip2-mediator';
+my $max_clients     = 120;
+my $syslog_facility = 'LOCAL0';
+my $daemonize       = 0;
 
-my $mediator = SIPTunnel::Mediator->new($config);
+sub usage {
+    my $exit = shift || 0;
+
+    print <<USAGE;
+
+Synopsis:
+
+    $0 --sip-address $sip_address --sip-port $sip_port \
+        --http-host $http_host --http-port $http_port \
+        --http-proto $http_proto --http-path /sip2-mediator \
+        --max-clients $max_clients --syslog-facility $syslog_facility
+
+Options:
+
+    --sip_address <$sip_address>
+        Listen address for SIP server.
+
+    --sip_port <$sip_port>
+        List port for SIP server.
+
+    --http_host <$http_host>
+        Hostname of HTTP API server.
+
+    --http_port <$http_port>
+        Port for HTTP API server.
+
+    --http_proto <$http_proto>
+        Protocoal for HTTP API server. http or https.
+        
+    --http_path <$http_path>
+        URL path for HTTP API server
+
+    --max_clients <$max_clients>
+        Maximum number of SIP client connections allowed.
+
+    --syslog_facility <$syslog_facility>
+
+    --daemonize
+        Detach and background the process.
+
+USAGE
+
+    exit($exit);
+}
+
+GetOptions(
+    'sip_address=s'     => \$sip_address,
+    'sip_port=s'        => \$sip_port,
+    'http_host=s'       => \$http_host,
+    'http_port=s'       => \$http_port,
+    'http_proto=s'      => \$http_proto,
+    'http_path=s'       => \$http_path,
+    'max_clients=s'     => \$max_clients,
+    'syslog_facility=s' => \$syslog_facility,
+    'daemonize'         => \$daemonize,
+    'help'              => sub { usage(0); }
+) or usage(1);
+
+my $mediator = SIPTunnel::Mediator->new({
+    sip_address     => $sip_address,
+    sip_port        => $sip_port,
+    http_host       => $http_host,
+    http_port       => $http_port,
+    http_proto      => $http_proto,
+    http_path       => $http_path,
+    max_clients     => $max_clients,
+    syslog_facility => $syslog_facility
+});
+
+if ($daemonize) {
+    exit(0) if fork(); # parent
+    chdir '/';
+    setsid;
+}
+
 $mediator->listen;
 
 

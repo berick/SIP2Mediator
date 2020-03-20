@@ -12,9 +12,12 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # -----------------------------------------------------------------------
-use strict; use warnings;
 
+# -----------------------------------------------------------------------
+# Models a single SIP client connection and its paired HTTP back-end.
+# -----------------------------------------------------------------------
 package SIPTunnel::Mediator::Session;
+use strict; use warnings;
 use Digest::MD5 qw/md5_hex/;
 use SIPTunnel::Spec;
 use Sys::Syslog qw(syslog);
@@ -29,27 +32,48 @@ sub new {
     my $self = {
         seskey => md5_hex(time."$$".rand()),
         sip_socket => $sip_socket,
-        http_path => $config->{http_path}
+        http_path => $config->{http_path},
+        http_port => $config->{http_port},
+        http_proto => $config->{http_proto},
+        http_host => $config->{http_host}
     };
 
+    $self = bless($self, $class);
+
+    $sip_socket_map{$self->sip_socket} = $self;
+    $self->create_http_socket;
+
+    syslog(LOG_DEBUG => 
+        "New SIP client connecting from ".$self->sip_socket_str);
+
+    return $self;
+}
+
+sub create_http_socket {
+    my $self = shift;
+    $self->http_dead(0);
+
+    if (my $sock = $self->http_socket) { # Clean up the old socket
+        syslog(LOG_DEBUG => 'Closing exhausted HTTP socket');
+        delete $http_socket_map{$sock};    
+        delete $self->{http_socket};
+        $sock->shutdown(2);
+        $sock->close;
+    }
+
     my %http_args = (
-        Host => $config->{http_address},
-        PeerPort => $config->{http_port},
+        Host => $self->{http_host},
+        PeerPort => $self->{http_port},
         KeepAlive => 1 # true
     );
 
-    if ($config->{http_proto} eq 'http') {
+    if ($self->{http_proto} eq 'http') {
         $self->{http_socket} = Net::HTTP::NB->new(%http_args);
     } else {
         $self->{http_socket} = Net::HTTPS::NB->new(%http_args);
     }
 
-    $self = bless($self, $class);
-
-    $sip_socket_map{$self->sip_socket} = $self;
     $http_socket_map{$self->http_socket} = $self;
-
-    return $self;
 }
 
 sub find_by_sip_socket {
@@ -98,11 +122,29 @@ sub sip_socket_str {
     return sprintf('%s:%s', $s->peerhost, $s->peerport);
 }
 
+sub dead {
+    my ($self, $value) = @_;
+    $self->{dead} = $value if defined $value;
+    return $self->{dead};
+}
+
+# True if the HTTP connection is no longer viable.
+sub http_dead {
+    my ($self, $value) = @_;
+    $self->{http_dead} = $value if defined $value;
+    return $self->{http_dead};
+}
+
 sub read_sip_socket {
     my $self = shift;
     my $sclient = $self->sip_socket_str;
 
-    local $/ = "\015";
+    local $SIG{'PIPE'} = sub {                                                 
+        syslog(LOG_DEBUG => "SIP client [$sclient] disconnected prematurely.");
+        $self->dead(1);
+    };    
+
+    local $/ = SIPTunnel::Spec::LINE_TERMINATOR;
     my $sip_txt = readline($self->sip_socket);
 
     unless ($sip_txt) {
@@ -110,7 +152,16 @@ sub read_sip_socket {
         return 0;
     }
 
+    chomp($sip_txt);
+
+    $sip_txt =~ s/\r|\n//g;         # Remove newlines
+    $sip_txt =~ s/^\s*[^A-z0-9]+//g; # Remove preceding junk
+    $sip_txt =~ s/[^A-z0-9]+$//g;    # Remove trailing junk
+
     syslog(LOG_DEBUG => "INPUT [$sclient] $sip_txt");
+
+    # Client sent an empty request.  Ignore it.
+    return 1 unless $sip_txt;
 
     my $msg = SIPTunnel::Message->from_sip($sip_txt);
 
@@ -140,13 +191,15 @@ sub read_http_socket {
     # When the HTTP server closes the connection as a result of a
     # KeepAlive timeout expiration, it will appear to IO::Select
     # that data is ready for reading.  However, if read_response_headers
-    # is called and no data is there, it will raise an error.
+    # is called and no data is there, Net::HTTP::NB will raise an error.
+    # Catch the error and 
     # Note that $sock->connected still shows as true in such cases.
     eval { ($code, $mess, %headers) = $sock->read_response_headers };
 
     if ($@) {
+        $self->http_dead(1);
         syslog(LOG_DEBUG => "[$sclient] HTTP server keepalive timed out.");
-        return 0;
+        return 1; # not an error condition
     }
 
     if ($code ne '200') {
@@ -188,12 +241,22 @@ sub relay_sip_response {
 
     syslog(LOG_DEBUG => "OUTPUT [$sclient] $sip_txt");
 
+    local $SIG{'PIPE'} = sub {                                                 
+        syslog(LOG_DEBUG => "SIP client [$sclient] disconnected prematurely");
+        $self->dead(1);
+    };    
+
     $self->sip_socket->print($sip_txt);
 
     return 1;
 }
 
+# -----------------------------------------------------------------------
+# Listens for new SIP client connections and routes requests and 
+# responses to the appropriate end points.
+# -----------------------------------------------------------------------
 package SIPTunnel::Mediator;
+use strict; use warnings;
 use Sys::Syslog qw(syslog openlog);
 use Net::HTTP::NB;
 use Net::HTTPS::NB;
@@ -241,11 +304,9 @@ sub listen {
         for my $socket (@ready) {
             my $session;
 
-            if ($socket == $server_socket) {
+            if ($socket == $server_socket) { # new SIP client
 
                 my $client = $server_socket->accept;
-
-                syslog(LOG_DEBUG => "New client connection: ".$client->peerhost);
 
                 $session =
                     SIPTunnel::Mediator::Session->new($self->config, $client);
@@ -253,30 +314,33 @@ sub listen {
                 $sip_socket_map{$client} =
                     $http_socket_map{$session->http_socket} = $session;
 
-                #$client->autoflush(1);
                 $select->add($client);
                 $select->add($session->http_socket);
 
-            } elsif ($session = 
+            } elsif ($session = # new SIP request
                 SIPTunnel::Mediator::Session->find_by_sip_socket($socket)) {
 
-                my $paddr = $session->sip_socket->peerhost;
-
-                unless ($session->read_sip_socket) {
+                if ($session->dead || !$session->read_sip_socket) {
                     $select->remove($session->sip_socket);
                     $select->remove($session->http_socket);
                     $session->cleanup;
                 }
 
-            } elsif ($session = 
+            } elsif ($session = # new HTTP response
                 SIPTunnel::Mediator::Session->find_by_http_socket($socket)) {
 
-                my $paddr = $session->sip_socket->peerhost;
-
-                unless ($session->read_http_socket) {
+                if ($session->dead || !$session->read_http_socket) {
                     $select->remove($session->sip_socket);
                     $select->remove($session->http_socket);
                     $session->cleanup;
+                }
+
+                if ($session->http_dead) {
+                    # Keepalive timed out.  Create a new connection and
+                    # add it to our select pool.
+                    $select->remove($session->http_socket);
+                    $session->create_http_socket;
+                    $select->add($session->http_socket);
                 }
             }
         }
