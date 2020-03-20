@@ -16,10 +16,10 @@
 # -----------------------------------------------------------------------
 # Models a single SIP client connection and its paired HTTP back-end.
 # -----------------------------------------------------------------------
-package SIPTunnel::Mediator::Session;
+package SIP2Mediator::Server::Session;
 use strict; use warnings;
 use Digest::MD5 qw/md5_hex/;
-use SIPTunnel::Spec;
+use SIP2Mediator::Spec;
 use Sys::Syslog qw(syslog);
 use URL::Encode::XS qw/url_encode_utf8/;
 
@@ -144,7 +144,7 @@ sub read_sip_socket {
         $self->dead(1);
     };    
 
-    local $/ = SIPTunnel::Spec::LINE_TERMINATOR;
+    local $/ = SIP2Mediator::Spec::LINE_TERMINATOR;
     my $sip_txt = readline($self->sip_socket);
 
     unless ($sip_txt) {
@@ -158,12 +158,12 @@ sub read_sip_socket {
     $sip_txt =~ s/^\s*[^A-z0-9]+//g; # Remove preceding junk
     $sip_txt =~ s/[^A-z0-9]+$//g;    # Remove trailing junk
 
-    syslog(LOG_DEBUG => "INPUT [$sclient] $sip_txt");
+    syslog(LOG_DEBUG => "[$sclient] INPUT $sip_txt");
 
     # Client sent an empty request.  Ignore it.
     return 1 unless $sip_txt;
 
-    my $msg = SIPTunnel::Message->from_sip($sip_txt);
+    my $msg = SIP2Mediator::Message->from_sip($sip_txt);
 
     return $self->relay_sip_request($msg);
 }
@@ -228,7 +228,7 @@ sub read_http_socket {
 
     #syslog(LOG_DEBUG => "[$sclient] HTTP response: $content");
 
-    my $msg = SIPTunnel::Message->from_json($content);
+    my $msg = SIP2Mediator::Message->from_json($content);
 
     return $self->relay_sip_response($msg);
 }
@@ -239,7 +239,7 @@ sub relay_sip_response {
 
     my $sip_txt = $msg->to_sip;
 
-    syslog(LOG_DEBUG => "OUTPUT [$sclient] $sip_txt");
+    syslog(LOG_DEBUG => "[$sclient] OUTPUT $sip_txt");
 
     local $SIG{'PIPE'} = sub {                                                 
         syslog(LOG_DEBUG => "SIP client [$sclient] disconnected prematurely");
@@ -255,7 +255,7 @@ sub relay_sip_response {
 # Listens for new SIP client connections and routes requests and 
 # responses to the appropriate end points.
 # -----------------------------------------------------------------------
-package SIPTunnel::Mediator;
+package SIP2Mediator::Server;
 use strict; use warnings;
 use Sys::Syslog qw(syslog openlog);
 use Net::HTTP::NB;
@@ -263,8 +263,8 @@ use Net::HTTPS::NB;
 use Socket;
 use IO::Select;
 use IO::Socket::INET;
-use SIPTunnel::Spec;
-use SIPTunnel::Message;
+use SIP2Mediator::Spec;
+use SIP2Mediator::Message;
 
 sub new {
     my ($class, $config) = @_;
@@ -282,7 +282,7 @@ sub config {
 sub listen {
     my $self = shift;
 
-    openlog('SIPTunnel', 'pid', $self->config->{syslog_facility});
+    openlog('SIP2Mediator', 'pid', $self->config->{syslog_facility});
 
     my $server_socket = IO::Socket::INET->new(
         Proto => 'tcp',
@@ -309,7 +309,7 @@ sub listen {
                 my $client = $server_socket->accept;
 
                 $session =
-                    SIPTunnel::Mediator::Session->new($self->config, $client);
+                    SIP2Mediator::Server::Session->new($self->config, $client);
 
                 $sip_socket_map{$client} =
                     $http_socket_map{$session->http_socket} = $session;
@@ -318,7 +318,7 @@ sub listen {
                 $select->add($session->http_socket);
 
             } elsif ($session = # new SIP request
-                SIPTunnel::Mediator::Session->find_by_sip_socket($socket)) {
+                SIP2Mediator::Server::Session->find_by_sip_socket($socket)) {
 
                 if ($session->dead || !$session->read_sip_socket) {
                     $select->remove($session->sip_socket);
@@ -327,7 +327,7 @@ sub listen {
                 }
 
             } elsif ($session = # new HTTP response
-                SIPTunnel::Mediator::Session->find_by_http_socket($socket)) {
+                SIP2Mediator::Server::Session->find_by_http_socket($socket)) {
 
                 if ($session->dead || !$session->read_http_socket) {
                     $select->remove($session->sip_socket);

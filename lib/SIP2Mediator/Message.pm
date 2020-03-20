@@ -12,13 +12,13 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # -----------------------------------------------------------------------
-package SIPTunnel::Message;
+package SIP2Mediator::Message;
 use strict; use warnings;
 use Locale::gettext;
 use JSON::XS;
-use SIPTunnel::Spec;
-use SIPTunnel::Field;
-use SIPTunnel::FixedField;
+use SIP2Mediator::Spec;
+use SIP2Mediator::Field;
+use SIP2Mediator::FixedField;
 
 my $json = JSON::XS->new;
 $json->ascii(1);
@@ -54,7 +54,7 @@ sub fields {
 
 sub add_field {
     my ($self, $spec, $value) = @_;
-    push(@{$self->{fields}}, SIPTunnel::Field->new($spec, $value)); 
+    push(@{$self->{fields}}, SIP2Mediator::Field->new($spec, $value)); 
 }
 
 sub maybe_add_field {
@@ -72,7 +72,7 @@ sub to_sip {
 
     $txt .= $_->to_sip for @{$self->fields};
 
-    $txt .= SIPTunnel::Spec::LINE_TERMINATOR;
+    $txt .= SIP2Mediator::Spec::LINE_TERMINATOR;
 
     return $txt;
 }
@@ -82,8 +82,8 @@ sub to_sip {
 sub from_sip {
     my ($class, $txt) = @_;
 
-    my $msg = SIPTunnel::Message->new;
-    $msg->{spec} = SIPTunnel::Spec::Message->find_by_code(substr($txt, 0, 2));
+    my $msg = SIP2Mediator::Message->new;
+    $msg->{spec} = SIP2Mediator::Spec::Message->find_by_code(substr($txt, 0, 2));
 
     $txt = substr($txt, 2);
 
@@ -91,7 +91,7 @@ sub from_sip {
         my $value = substr($txt, 0, $ffspec->length);
         $txt = substr($txt, $ffspec->length);
         push(@{$msg->fixed_fields}, 
-            SIPTunnel::FixedField->new($ffspec, $value));
+            SIP2Mediator::FixedField->new($ffspec, $value));
     }
 
     # Some messages only have fixed fields.
@@ -101,8 +101,8 @@ sub from_sip {
 
     for my $part (@parts) {
         last unless $part;
-        my $fspec = SIPTunnel::Spec::Field->find_by_code(substr($part, 0, 2));
-        push(@{$msg->fields}, SIPTunnel::Field->new($fspec, substr($part, 2)));
+        my $fspec = SIP2Mediator::Spec::Field->find_by_code(substr($part, 0, 2));
+        push(@{$msg->fields}, SIP2Mediator::Field->new($fspec, substr($part, 2)));
     }
 
     return $msg;
@@ -114,10 +114,10 @@ sub to_json {
     my @ffields;
     my @fields;
 
-    push(@ffields, SIPTunnel::Spec::sip_string($_->value)) 
+    push(@ffields, SIP2Mediator::Spec::sip_string($_->value)) 
         for @{$self->fixed_fields};
 
-    push(@fields, {$_->spec->code => SIPTunnel::Spec::sip_string($_->value)}) 
+    push(@fields, {$_->spec->code => SIP2Mediator::Spec::sip_string($_->value)}) 
         for @{$self->fields};
 
     return $json->encode({
@@ -150,7 +150,7 @@ sub from_json {
     for my $field (@{$hash->{fields}}) {
         for my $code (keys(%$field)) { # will only be one
             my $value = $field->{$code};
-            my $spec = SIPTunnel::Spec::Field->find_by_code($code);
+            my $spec = SIP2Mediator::Spec::Field->find_by_code($code);
             $msg->add_field($spec, $value);
         }
     }

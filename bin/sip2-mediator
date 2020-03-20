@@ -17,7 +17,7 @@
 use strict; use warnings;
 use POSIX;
 use Getopt::Long;
-use SIPTunnel::Mediator;
+use SIP2Mediator::Server;
 
 my $sip_address     = '127.0.0.1';
 my $sip_port        = 6001;
@@ -87,7 +87,7 @@ GetOptions(
     'help'              => sub { usage(0); }
 ) or usage(1);
 
-my $mediator = SIPTunnel::Mediator->new({
+my $mediator = SIP2Mediator::Server->new({
     sip_address     => $sip_address,
     sip_port        => $sip_port,
     http_host       => $http_host,

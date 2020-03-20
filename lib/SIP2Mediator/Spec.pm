@@ -12,7 +12,7 @@
 # MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 # GNU General Public License for more details.
 # -----------------------------------------------------------------------
-package SIPTunnel::Spec::FixedField;
+package SIP2Mediator::Spec::FixedField;
 use strict; use warnings;
 
 sub new {
@@ -37,7 +37,7 @@ sub label {
 }
 
 
-package SIPTunnel::Spec::Field;
+package SIP2Mediator::Spec::Field;
 use strict; use warnings;
 
 # code => spec map of registered fields
@@ -74,13 +74,13 @@ sub find_by_code {
         # no spec found for the given code.  This can happen when
         # nonstandard fields are used (which is OK).  Create a new 
         # spec using the code as the label.
-        $spec = SIPTunnel::Spec::Field->new($code, $code);
+        $spec = SIP2Mediator::Spec::Field->new($code, $code);
     }
 
     return $spec;
 }
 
-package SIPTunnel::Spec::Message;
+package SIP2Mediator::Spec::Message;
 use strict; use warnings;
 
 # code => spec map of registered message specs
@@ -125,11 +125,11 @@ sub find_by_code {
 }
 
 # - Compiled SIP Fixed Field, Field, and Message Specifications and Constants -
-package SIPTunnel::Spec;
+package SIP2Mediator::Spec;
 use strict; use warnings;
 use Locale::gettext;
 
-my $l = Locale::gettext->domain("SIPTunnel");
+my $l = Locale::gettext->domain("SIP2Mediator");
 
 use constant TEXT_ENCODING     => 'UTF-8';
 use constant SIP_DATETIME      => '%Y%m%d    %H%M%S';
@@ -150,7 +150,7 @@ sub sip_string {
 package FFSpec;
 use strict; use warnings;
 
-my $STSFF = 'SIPTunnel::Spec::FixedField'; # shorthand
+my $STSFF = 'SIP2Mediator::Spec::FixedField'; # shorthand
 
 $FFSpec::date                = $STSFF->new(18, $l->get('transaction date'));
 $FFSpec::ok                  = $STSFF->new(1,  $l->get('ok'));
@@ -198,7 +198,7 @@ $FFSpec::date_time_sync      = $STSFF->new(18, $l->get('date/time sync'));
 package FSpec;
 use strict; use warnings;
 
-my $STSF = 'SIPTunnel::Spec::Field'; # shorthand
+my $STSF = 'SIP2Mediator::Spec::Field'; # shorthand
 
 $FSpec::patron_id          = $STSF->new('AA', $l->get('patron identifier'));
 $FSpec::item_id            = $STSF->new('AB', $l->get('item identifier'));
@@ -279,7 +279,7 @@ $FSpec::check_number       = $STSF->new('RN', $l->get('check number'));
 package MSpec;
 use strict; use warnings;
 
-my $STSM = 'SIPTunnel::Spec::Message'; # shorthand
+my $STSM = 'SIP2Mediator::Spec::Message'; # shorthand
 
 $MSpec::sc_status = $STSM->new(
     '99', $l->get('SC Status'), [
