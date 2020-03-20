@@ -152,9 +152,8 @@ sub read_sip_socket {
         return 0;
     }
 
-    chomp($sip_txt);
-
-    $sip_txt =~ s/\r|\n//g;         # Remove newlines
+    chomp($sip_txt);                 # remove line terminator
+    $sip_txt =~ s/\r|\n//g;          # Remove newlines
     $sip_txt =~ s/^\s*[^A-z0-9]+//g; # Remove preceding junk
     $sip_txt =~ s/[^A-z0-9]+$//g;    # Remove trailing junk
 
@@ -189,11 +188,12 @@ sub read_http_socket {
     my ($code, $mess, %headers);
 
     # When the HTTP server closes the connection as a result of a
-    # KeepAlive timeout expiration, it will appear to IO::Select
-    # that data is ready for reading.  However, if read_response_headers
-    # is called and no data is there, Net::HTTP::NB will raise an error.
-    # Catch the error and 
-    # Note that $sock->connected still shows as true in such cases.
+    # KeepAlive timeout expiration, it will appear to IO::Select that
+    # data is ready for reading.  However, if read_response_headers is
+    # called and no data is there, Net::HTTP::NB will raise an error.
+    # Catch the error and mark the current HTTP socket as dead so a new
+    # one can be created. # Note that $sock->connected still shows as
+    # true in such cases.
     eval { ($code, $mess, %headers) = $sock->read_response_headers };
 
     if ($@) {
