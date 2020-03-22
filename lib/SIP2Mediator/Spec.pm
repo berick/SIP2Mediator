@@ -64,16 +64,14 @@ sub label {
 }
 
 # Returns the field spec for the given code.
-# If no such field is known, a new field is registered using the code
-# as the code and label.
+# If no such field is known, a new field is registered.
 sub find_by_code {
     my ($class, $code) = @_;
     my $spec = $known_fields{$code};
 
     if (!$spec) {
         # no spec found for the given code.  This can happen when
-        # nonstandard fields are used (which is OK).  Create a new 
-        # spec using the code as the label.
+        # nonstandard fields are used.  Create a new spec for it.
         $spec = SIP2Mediator::Spec::Field->new($code, $code);
     }
 
@@ -131,10 +129,7 @@ use Locale::gettext;
 
 my $l = Locale::gettext->domain("SIP2Mediator");
 
-use constant TEXT_ENCODING     => 'UTF-8';
-use constant SIP_DATETIME      => '%Y%m%d    %H%M%S';
 use constant LINE_TERMINATOR   => "\r";
-use constant SOCKET_BUFSIZE    => 4096;
 use constant STRING_COLUMN_PAD => 32; # for printing/debugging 
 
 # Prepare a string value for adding to a SIP message string.

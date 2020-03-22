@@ -32,10 +32,7 @@ sub new {
     my $self = {
         seskey => md5_hex(time."$$".rand()),
         sip_socket => $sip_socket,
-        http_path => $config->{http_path},
-        http_port => $config->{http_port},
-        http_proto => $config->{http_proto},
-        http_host => $config->{http_host}
+        config => $config
     };
 
     $self = bless($self, $class);
@@ -47,6 +44,11 @@ sub new {
         "New SIP client connecting from ".$self->sip_socket_str);
 
     return $self;
+}
+
+sub config {
+    my $self = shift;
+    return $self->{config};
 }
 
 sub create_http_socket {
@@ -62,12 +64,12 @@ sub create_http_socket {
     }
 
     my %http_args = (
-        Host => $self->{http_host},
-        PeerPort => $self->{http_port},
+        Host => $self->config->{http_host},
+        PeerPort => $self->config->{http_port},
         KeepAlive => 1 # true
     );
 
-    if ($self->{http_proto} eq 'http') {
+    if ($self->config->{http_proto} eq 'http') {
         $self->{http_socket} = Net::HTTP::NB->new(%http_args);
     } else {
         $self->{http_socket} = Net::HTTPS::NB->new(%http_args);
@@ -76,12 +78,12 @@ sub create_http_socket {
     $http_socket_map{$self->http_socket} = $self;
 }
 
-sub find_by_sip_socket {
+sub from_sip_socket {
     my ($class, $socket) = @_;
     return $sip_socket_map{$socket};
 }
 
-sub find_by_http_socket {
+sub from_http_socket {
     my ($class, $socket) = @_;
     return $http_socket_map{$socket};
 }
@@ -109,11 +111,6 @@ sub sip_socket {
 sub http_socket {
     my $self = shift;
     return $self->{http_socket};
-}
-
-sub http_path {
-    my $self = shift;
-    return $self->{http_path};
 }
 
 sub sip_socket_str {
@@ -175,7 +172,7 @@ sub relay_sip_request {
 
     #syslog(LOG_INFO => "POST: $post");
 
-    $self->http_socket->write_request(POST => $self->http_path, $post);
+    $self->http_socket->write_request(POST => $self->config->{http_path}, $post);
 
     return 1;
 }
@@ -311,14 +308,11 @@ sub listen {
                 $session =
                     SIP2Mediator::Server::Session->new($self->config, $client);
 
-                $sip_socket_map{$client} =
-                    $http_socket_map{$session->http_socket} = $session;
-
                 $select->add($client);
                 $select->add($session->http_socket);
 
             } elsif ($session = # new SIP request
-                SIP2Mediator::Server::Session->find_by_sip_socket($socket)) {
+                SIP2Mediator::Server::Session->from_sip_socket($socket)) {
 
                 if ($session->dead || !$session->read_sip_socket) {
                     $select->remove($session->sip_socket);
@@ -327,7 +321,7 @@ sub listen {
                 }
 
             } elsif ($session = # new HTTP response
-                SIP2Mediator::Server::Session->find_by_http_socket($socket)) {
+                SIP2Mediator::Server::Session->from_http_socket($socket)) {
 
                 if ($session->dead || !$session->read_http_socket) {
                     $select->remove($session->sip_socket);
