@@ -1,5 +1,13 @@
 # SIP2Mediator
 
+## Install (Ubuntu)
+
+'''sh
+git clone github.com:berick/SIP2Mediator
+sudo apt install build-essential libjson-xs-perl libnet-https-nb-perl
+sudo cpan URL::Encode::XS
+'''
+
 ## Usage
 
 PERL5LIB=lib ./bin/sip2-mediator --help
