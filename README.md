@@ -10,8 +10,10 @@ sudo cpan URL::Encode::XS
 
 ## Usage
 
+```sh
 cd SIP2Mediator
 PERL5LIB=lib ./bin/sip2-mediator --help
+```
 
 ## About
 
