@@ -85,6 +85,8 @@ sub from_sip {
     my $msg = SIP2Mediator::Message->new;
     $msg->{spec} = SIP2Mediator::Spec::Message->find_by_code(substr($txt, 0, 2));
 
+    return undef unless $msg->{spec};
+
     $txt = substr($txt, 2);
 
     for my $ffspec (@{$msg->spec->fixed_fields}) {

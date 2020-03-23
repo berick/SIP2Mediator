@@ -40,8 +40,8 @@ sub new {
     $sip_socket_map{$self->sip_socket} = $self;
     $self->create_http_socket;
 
-    syslog(LOG_DEBUG => 
-        "New SIP client connecting from ".$self->sip_socket_str);
+    my $sclient = $self->sip_socket_str;
+    syslog(LOG_DEBUG => "[$sclient] New SIP client connecting");
 
     return $self;
 }
@@ -56,7 +56,8 @@ sub create_http_socket {
     $self->http_dead(0);
 
     if (my $sock = $self->http_socket) { # Clean up the old socket
-        syslog(LOG_DEBUG => 'Closing exhausted HTTP socket');
+        my $sclient = $self->sip_socket_str;
+        syslog(LOG_DEBUG => "[$sclient] Closing exhausted HTTP socket");
         delete $http_socket_map{$sock};    
         delete $self->{http_socket};
         $sock->shutdown(2);
@@ -137,7 +138,7 @@ sub read_sip_socket {
     my $sclient = $self->sip_socket_str;
 
     local $SIG{'PIPE'} = sub {                                                 
-        syslog(LOG_DEBUG => "SIP client [$sclient] disconnected prematurely.");
+        syslog(LOG_DEBUG => "[$sclient] SIP client disconnected prematurely.");
         $self->dead(1);
     };    
 
@@ -145,7 +146,7 @@ sub read_sip_socket {
     my $sip_txt = readline($self->sip_socket);
 
     unless ($sip_txt) {
-        syslog(LOG_DEBUG => "SIP client [$sclient] disconnected");
+        syslog(LOG_DEBUG => "[$sclient] SIP client disconnected");
         return 0;
     }
 
@@ -160,6 +161,11 @@ sub read_sip_socket {
     return 1 unless $sip_txt;
 
     my $msg = SIP2Mediator::Message->from_sip($sip_txt);
+
+    if (!$msg) {
+        syslog(LOG_DEBUG => "[$sclient] sent invalid SIP: $sip_txt");
+        return 0;
+    }
 
     return $self->relay_sip_request($msg);
 }

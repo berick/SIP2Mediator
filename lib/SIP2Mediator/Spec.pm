@@ -113,13 +113,7 @@ sub fixed_fields {
 
 sub find_by_code {
     my ($class, $code) = @_;
-
-    my $spec = $known_messages{$code};
-
-    # Nothing we can do with unknown message types.
-    warn "No such SIP2 message code = $code\n" unless $spec;
-
-    return $spec;
+    return $known_messages{$code};
 }
 
 # - Compiled SIP Fixed Field, Field, and Message Specifications and Constants -

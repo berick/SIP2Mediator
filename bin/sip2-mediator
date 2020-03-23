@@ -75,14 +75,14 @@ USAGE
 }
 
 GetOptions(
-    'sip_address=s'     => \$sip_address,
-    'sip_port=s'        => \$sip_port,
-    'http_host=s'       => \$http_host,
-    'http_port=s'       => \$http_port,
-    'http_proto=s'      => \$http_proto,
-    'http_path=s'       => \$http_path,
-    'max_clients=s'     => \$max_clients,
-    'syslog_facility=s' => \$syslog_facility,
+    'sip-address=s'     => \$sip_address,
+    'sip-port=s'        => \$sip_port,
+    'http-host=s'       => \$http_host,
+    'http-port=s'       => \$http_port,
+    'http-proto=s'      => \$http_proto,
+    'http-path=s'       => \$http_path,
+    'max-clients=s'     => \$max_clients,
+    'syslog-facility=s' => \$syslog_facility,
     'daemonize'         => \$daemonize,
     'help'              => sub { usage(0); }
 ) or usage(1);
