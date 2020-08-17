@@ -150,10 +150,8 @@ sub read_sip_socket {
         return 0;
     }
 
-    chomp($sip_txt);                 # remove line terminator
-    $sip_txt =~ s/\r|\n//g;          # Remove newlines
-    $sip_txt =~ s/^\s*[^A-z0-9]+//g; # Remove preceding junk
-    $sip_txt =~ s/[^A-z0-9]+$//g;    # Remove trailing junk
+
+    $sip_text = SIP2Mediator::Message->clean_sip_packet($sip_text);
 
     syslog(LOG_DEBUG => "[$sclient] INPUT $sip_txt");
 

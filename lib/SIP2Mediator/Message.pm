@@ -77,6 +77,18 @@ sub to_sip {
     return $txt;
 }
 
+
+# Removes gunk from a SIP message pulled directly from the socket.
+sub clean_sip_packet {
+    my ($class, $txt) = @_;
+    chomp($txt);                 # remove line terminator
+    $txt =~ s/\r|\n//g;          # Remove newlines
+    $txt =~ s/^\s*[^A-z0-9]+//g; # Remove preceding junk
+    $txt =~ s/[^A-z0-9]+$//g;    # Remove trailing junk
+    return $txt;
+}
+
+
 # Turns a SIP string into a Message
 # Assumes the final line terminator character has been removed.
 sub from_sip {
