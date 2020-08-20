@@ -11,6 +11,7 @@ my $sip_username = 'admin';
 my $sip_password = 'demo123';
 my $institution = 'gapines';
 my $patron_barcode = '99999373998';
+my $patron_password = 'demo123';
 
 my $client = SIP2Mediator::Client->new({
     syslog_facility => 'LOCAL0',
@@ -51,6 +52,27 @@ $client->send($patron_status);
 $resp = $client->recv;
 
 print "RECEIVED:\n" . $resp->to_str . "\n";
+
+my $patron_info_hash = {
+    code => '63',
+    fixed_fields => ['000', SIP2Mediator::Spec->sip_date, ' 'x10],
+    fields => [
+        {AO => $institution}, 
+        {AA => $patron_barcode},
+        {AD => $patron_password}
+    ]
+};
+
+my $patron_info = SIP2Mediator::Message->from_hash($patron_info_hash);
+
+print "SENDING:\n" . $patron_info->to_str . "\n";
+
+$client->send($patron_info);
+
+$resp = $client->recv;
+
+print "RECEIVED:\n" . $resp->to_str . "\n";
+
 
 __DATA__
 
