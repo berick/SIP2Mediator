@@ -128,10 +128,10 @@ sub to_json {
     my @ffields;
     my @fields;
 
-    push(@ffields, SIP2Mediator::Spec::sip_string($_->value)) 
+    push(@ffields, SIP2Mediator::Spec->sip_string($_->value)) 
         for @{$self->fixed_fields};
 
-    push(@fields, {$_->spec->code => SIP2Mediator::Spec::sip_string($_->value)}) 
+    push(@fields, {$_->spec->code => SIP2Mediator::Spec->sip_string($_->value)}) 
         for @{$self->fields};
 
     return $json->encode({
@@ -147,6 +147,13 @@ sub from_json {
     return undef unless $msg_json;
 
     my $hash = $json->decode($msg_json);
+
+    return $class->from_hash($hash);
+}
+
+# Message from our JSON format as a hash/object.
+sub from_hash {
+    my ($class, $hash) = @_;
 
     # Start with a SIP message string which contains only the 
     # message code and fixed fields.

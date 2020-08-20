@@ -120,18 +120,26 @@ sub find_by_code {
 package SIP2Mediator::Spec;
 use strict; use warnings;
 use Locale::gettext;
+use DateTime;
 
 my $l = Locale::gettext->domain("SIP2Mediator");
 
 use constant LINE_TERMINATOR   => "\r";
 use constant STRING_COLUMN_PAD => 32; # for printing/debugging 
+use constant SIP_DATE_FORMAT => "%Y%m%d    %H%M%S";
 
 # Prepare a string value for adding to a SIP message string.
 sub sip_string {
-    my $value = shift;
+    my ($class, $value) = @_;
     $value = defined $value ? "$value" : '';
     $value =~ s/\|//g;
     return $value;
+}
+
+sub sip_date {
+    my ($class, $date) = @_;
+    $date ||= DateTime->now;
+    return $date->strftime(SIP_DATE_FORMAT);
 }
 
 # --- Fixed Field Definitions ----------------------------------------------

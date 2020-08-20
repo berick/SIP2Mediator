@@ -39,7 +39,7 @@ sub value {
 
 sub to_sip {
     my $self = shift;
-    return $self->spec->code . SIP2Mediator::Spec::sip_string($self->value) . '|';
+    return $self->spec->code . SIP2Mediator::Spec->sip_string($self->value) . '|';
 }
 
 sub to_str {
@@ -48,7 +48,7 @@ sub to_str {
     my $spaces = 
         SIP2Mediator::Spec::STRING_COLUMN_PAD - length($self->spec->label) - 5;
 
-    my $value = SIP2Mediator::Spec::sip_string($self->value);
+    my $value = SIP2Mediator::Spec->sip_string($self->value);
 
     return sprintf('[%s] %s %s %s', 
         $self->spec->code, $self->spec->label, ' ' x $spaces, $value);

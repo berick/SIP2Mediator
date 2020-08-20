@@ -19,7 +19,7 @@ use base qw/SIP2Mediator::Field/;
 
 sub to_sip {
     my $self = shift;
-    return SIP2Mediator::Spec::sip_string($self->value);
+    return SIP2Mediator::Spec->sip_string($self->value);
 }
 
 sub to_str {
@@ -28,7 +28,7 @@ sub to_str {
     my $spaces = 
         SIP2Mediator::Spec::STRING_COLUMN_PAD - length($self->spec->label);
 
-    my $value = SIP2Mediator::Spec::sip_string($self->value);
+    my $value = SIP2Mediator::Spec->sip_string($self->value);
 
     return sprintf('%s %s %s', $self->spec->label, ' ' x $spaces, $value);
 }
