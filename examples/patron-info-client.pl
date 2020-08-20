@@ -7,6 +7,14 @@ use SIP2Mediator::Spec;
 use SIP2Mediator::Field;
 use SIP2Mediator::FixedField;
 
+# ------------------------------------------------------------------------
+# Connect to SIP server.
+# Login
+# Patron Status request
+# Patron Info request
+# Disconnect
+# ------------------------------------------------------------------------
+
 my $sip_username = 'admin';
 my $sip_password = 'demo123';
 my $institution = 'gapines';
@@ -72,6 +80,8 @@ $client->send($patron_info);
 $resp = $client->recv;
 
 print "RECEIVED:\n" . $resp->to_str . "\n";
+
+$client->disconnect;
 
 
 __DATA__
