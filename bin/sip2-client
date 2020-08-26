@@ -1,0 +1,162 @@
+#!/usr/bin/perl
+#:vim:ft=perl
+use strict;
+use warnings;
+use Getopt::Long;
+use SIP2Mediator::Client;
+use SIP2Mediator::Message;
+use SIP2Mediator::Spec;
+use SIP2Mediator::Field;
+use SIP2Mediator::FixedField;
+
+my $client; # SIP connection
+
+my $sip_address   = '127.0.0.1';
+my $sip_port      = 6001;
+my $sip_username;
+my $sip_password;
+my $institution;
+my @messages;
+
+my $item_barcode;
+my $patron_barcode;
+my $patron_password;
+
+sub usage {
+    my $exit = shift || 0;
+    my $msg = shift;
+
+    print <<USAGE;
+
+Synopsis:
+
+    $0 --sip-address $sip_address --sip-port $sip_port \
+       --sip-username siplogin --sip-password sippassword \
+       --institution myplace --item-barcode 123456789 \
+       --patron-barcode 987654321 --patron-password demo123
+       --message item-information --message patron-information
+       --message patron-status
+
+Options:
+
+    --sip-address <$sip_address>
+        Listen address for SIP server.
+
+    --sip-port <$sip_port>
+        List port for SIP server.
+
+    --sip-username <username>
+    --sip-password <password>
+
+    --item-barcode <item_barcode>
+    --patron-barcode <patron_barcode>
+    --patron-password <patron_password>
+
+    --message <message-name>; repeatable
+        Supported values:
+        'item-information'
+        'patron-information'
+        'patron-status'
+        TODO ADD MORE
+USAGE
+
+    warn "\n! $msg !\n" if $msg;
+
+    exit($exit);
+}
+
+sub send_recv {
+    my $msg_hash = shift;
+
+    my $msg = SIP2Mediator::Message->from_hash($msg_hash);
+
+    print "SENDING:\n" . $msg->to_str . "\n";
+
+    $client->send($msg);
+
+    my $resp = $client->recv;
+
+    print "RECEIVED:\n" . $resp->to_str . "\n";
+}
+
+sub login {
+    send_recv({
+        code => 93,
+        fixed_fields => ['0', '0'],
+        fields => [{CN => $sip_username}, {CO => $sip_password}]
+    });
+}
+
+sub item_information {
+
+    die "--item-barcode required for item-information\n" unless $item_barcode;
+
+    send_recv({
+        code => 17,
+        fixed_fields => [SIP2Mediator::Spec->sip_date],
+        fields => [{AO => $institution}, {AB => $item_barcode}]
+    });
+}
+
+sub patron_status {
+
+    die "--patron-barcode required for patron-status\n" unless $patron_barcode;
+
+    send_recv({
+        code => '23',
+        fixed_fields => ['000', SIP2Mediator::Spec->sip_date],
+        fields => [{AO => $institution}, {AA => $patron_barcode}]
+    });
+}
+
+sub patron_information {
+
+    die "--patron-barcode required for patron-information\n" unless $patron_barcode;
+
+    send_recv({
+        code => '63',
+        fixed_fields => ['000', SIP2Mediator::Spec->sip_date, ' 'x10],
+        fields => [
+            {AO => $institution}, 
+            {AA => $patron_barcode},
+            $patron_password ? {AD => $patron_password} : ()
+        ]
+    });
+}
+
+GetOptions(
+    'sip-address=s'     => \$sip_address,
+    'sip-port=s'        => \$sip_port,
+    'sip-username=s'    => \$sip_username,
+    'sip-password=s'    => \$sip_password,
+    'institution=s'     => \$institution,
+    'item-barcode=s'    => \$item_barcode,
+    'patron-barcode=s'  => \$patron_barcode,
+    'patron-password=s' => \$patron_password,
+    'message=s'         => \@messages,
+    'help'               => sub { usage(0); }
+) or usage(1);
+
+usage(1, "--sip-address required")  unless $sip_address;
+usage(1, "--sip-port required")     unless $sip_port;
+usage(1, "--sip-username required") unless $sip_username;
+usage(1, "--sip-password required") unless $sip_password;
+usage(1, "--institution required")  unless $institution;
+
+$client = SIP2Mediator::Client->new({
+    sip_address => $sip_address,
+    sip_port => $sip_port
+});
+
+die "Client unable to connect\n" unless $client->connect;
+
+login();
+
+for my $msg (@messages) {
+    item_information() if $msg eq 'item-information';
+    patron_information() if $msg eq 'patron-information';
+    patron_status() if $msg eq 'patron-status';
+}
+
+$client->disconnect;
+
