@@ -3,6 +3,7 @@
 use strict;
 use warnings;
 use Getopt::Long;
+use Time::HiRes qw/time/;
 use SIP2Mediator::Client;
 use SIP2Mediator::Message;
 use SIP2Mediator::Spec;
@@ -11,6 +12,7 @@ use SIP2Mediator::FixedField;
 
 my $client; # SIP connection
 
+my $pretty_print;
 my $sip_address   = '127.0.0.1';
 my $sip_port      = 6001;
 my $sip_username;
@@ -21,6 +23,7 @@ my @messages;
 my $item_barcode;
 my $patron_barcode;
 my $patron_password;
+my $patron_summary = ' 'x10;
 
 sub usage {
     my $exit = shift || 0;
@@ -39,6 +42,10 @@ Synopsis:
 
 Options:
 
+    --pretty-print
+        Print SIP messages as tabular key/value pairs.  
+        Otherwise, raw SIP messages are printed.
+
     --sip-address <$sip_address>
         Listen address for SIP server.
 
@@ -48,9 +55,15 @@ Options:
     --sip-username <username>
     --sip-password <password>
 
-    --item-barcode <item_barcode>
-    --patron-barcode <patron_barcode>
-    --patron-password <patron_password>
+    --item-barcode <barcode>
+    --patron-barcode <barcode>
+    --patron-password <password>
+
+    --patron-summary <10-chars>
+        Override the 'patron summary' string for the Patron Information
+        request.  Useful for requesting additional data in the response.
+        E.g. to request hold items: --patron-summary "Y         "
+        
 
     --message <message-name>; repeatable
         Supported values:
@@ -70,13 +83,19 @@ sub send_recv {
 
     my $msg = SIP2Mediator::Message->from_hash($msg_hash);
 
-    print "SENDING:\n" . $msg->to_str . "\n";
+    print sprintf("[SENDING]\n%s\n----------------\n", 
+        $pretty_print ? $msg->to_str : $msg->to_sip);
 
+    my $start = time();
     $client->send($msg);
 
     my $resp = $client->recv;
+    my $duration = sprintf("%0.3f", time() - $start);
 
-    print "RECEIVED:\n" . $resp->to_str . "\n";
+    die "No response received!\n" unless $resp;
+
+    print sprintf("[RECEIVED, duration: %s]:\n%s\n----------------\n", 
+        $duration, $pretty_print ? $resp->to_str : $resp->to_sip);
 }
 
 sub login {
@@ -115,7 +134,11 @@ sub patron_information {
 
     send_recv({
         code => '63',
-        fixed_fields => ['000', SIP2Mediator::Spec->sip_date, ' 'x10],
+        fixed_fields => [
+            '000', # Language
+            SIP2Mediator::Spec->sip_date,
+            $patron_summary
+        ],
         fields => [
             {AO => $institution}, 
             {AA => $patron_barcode},
@@ -125,6 +148,7 @@ sub patron_information {
 }
 
 GetOptions(
+    'pretty-print'      => \$pretty_print,
     'sip-address=s'     => \$sip_address,
     'sip-port=s'        => \$sip_port,
     'sip-username=s'    => \$sip_username,
@@ -133,6 +157,7 @@ GetOptions(
     'item-barcode=s'    => \$item_barcode,
     'patron-barcode=s'  => \$patron_barcode,
     'patron-password=s' => \$patron_password,
+    'patron-summary=s'  => \$patron_summary,
     'message=s'         => \@messages,
     'help'               => sub { usage(0); }
 ) or usage(1);
@@ -142,6 +167,9 @@ usage(1, "--sip-port required")     unless $sip_port;
 usage(1, "--sip-username required") unless $sip_username;
 usage(1, "--sip-password required") unless $sip_password;
 usage(1, "--institution required")  unless $institution;
+usage(1, "Patron summary string must be 10 characters")
+    if ($patron_summary && length($patron_summary) != 10);
+
 
 $client = SIP2Mediator::Client->new({
     sip_address => $sip_address,

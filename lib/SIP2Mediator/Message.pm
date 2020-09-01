@@ -186,6 +186,7 @@ sub to_str {
 
     $txt .= $_->to_str . "\n" for @{$self->fixed_fields};
     $txt .= $_->to_str . "\n" for @{$self->fields};
+    chomp($txt);
 
     return $txt;
 }
