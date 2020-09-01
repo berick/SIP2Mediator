@@ -30,6 +30,24 @@ it can integrate with any ILS which provides the required HTTP back-end.
 
 SIP Client <=> SIP <=> SIP2Mediator <=> JSON <=> HTTP Server
 
+### SIP Messages as JSON
+
+* Message are encoded as JSON Objects with a "code", "fixed\_fields", 
+  and optionally "fields" keys.
+
+Example SIP Login Message
+
+```json
+{                                                              
+  "code": 93,                                                            
+  "fixed_fields": ["0", "0"],                                            
+  "fields": [
+    {CN => "sip_username"}, 
+    {CO => "sip_password"}
+  ]               
+}
+```
+
 ## SIP2Mediator Client
 
 A SIP2 client library and command line tool are included for testing.
