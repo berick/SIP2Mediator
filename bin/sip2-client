@@ -67,6 +67,7 @@ Options:
 
     --message <message-name>; repeatable
         Supported values:
+        'sc-status'
         'item-information'
         'patron-information'
         'patron-status'
@@ -103,6 +104,13 @@ sub login {
         code => 93,
         fixed_fields => ['0', '0'],
         fields => [{CN => $sip_username}, {CO => $sip_password}]
+    });
+}
+
+sub sc_status {
+    send_recv({
+        code => 99,
+        fixed_fields => ['0', '999', '2.00']
     });
 }
 
@@ -181,6 +189,7 @@ die "Client unable to connect\n" unless $client->connect;
 login();
 
 for my $msg (@messages) {
+    sc_status() if $msg eq 'sc-status';
     item_information() if $msg eq 'item-information';
     patron_information() if $msg eq 'patron-information';
     patron_status() if $msg eq 'patron-status';

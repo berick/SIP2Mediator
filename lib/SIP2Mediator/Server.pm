@@ -150,8 +150,7 @@ sub read_sip_socket {
         return 0;
     }
 
-
-    $sip_text = SIP2Mediator::Message->clean_sip_packet($sip_text);
+    $sip_txt = SIP2Mediator::Message->clean_sip_packet($sip_txt);
 
     syslog(LOG_DEBUG => "[$sclient] INPUT $sip_txt");
 
