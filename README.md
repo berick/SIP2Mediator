@@ -42,8 +42,8 @@ Example SIP Login Message
   "code": 93,                                                            
   "fixed_fields": ["0", "0"],                                            
   "fields": [
-    {CN => "sip_username"}, 
-    {CO => "sip_password"}
+    {"CN": "sip_username"}, 
+    {"CO": "sip_password"}
   ]               
 }
 ```
