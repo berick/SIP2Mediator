@@ -266,6 +266,9 @@ use IO::Socket::INET;
 use SIP2Mediator::Spec;
 use SIP2Mediator::Message;
 
+my $shutdown_requested = 0;
+$SIG{USR1} = sub { $shutdown_requested = 1; };
+
 sub new {
     my ($class, $config) = @_;
 
@@ -277,6 +280,23 @@ sub new {
 sub config {
     my $self = shift;
     return $self->{config};
+}
+
+sub cleanup {
+    my $self = shift;
+    syslog(LOG_INFO => 'Cleaning up and exiting');
+
+    for my $sock (keys %sip_socket_map) {
+        my $ses = SIP2Mediator::Server::Session->from_sip_socket($sock);
+        $ses->cleanup if $ses;
+    }
+
+    exit(0);
+}
+
+sub client_count {
+    my $self = shift;
+    return scalar(keys(%sip_socket_map));
 }
 
 sub listen {
@@ -299,7 +319,35 @@ sub listen {
 
     syslog(LOG_INFO => 'Ready for clients...');
 
-    while (my @ready = $select->can_read) {
+    # Incremented with each SIP request, decremented with each response
+    # returned.  When the value is zero, no requests are in flight.
+    # Each request will be met with exactly one response.
+    my $in_flight = 0;
+
+    while (1) {
+
+        if ($shutdown_requested) {
+            syslog(LOG_INFO => 'Shutdown requested...');
+
+            if ($server_socket) { 
+                # Shut down the server socket to prevent new connections.
+                # Clienet sockets will be shut down once it's safe to
+                # complete the graceful shutdown.
+                $select->remove($server_socket);
+                $server_socket->shutdown(2);
+                $server_socket->close;
+                $server_socket = undef;
+            }
+
+            # cleanup calls exit
+            $self->cleanup if ($in_flight == 0 || $select->count == 0);
+
+            syslog(LOG_DEBUG => 
+                "Waiting for requests to settle in shutdown. in_flight=$in_flight");
+        }
+
+        # Block until we have work to do.
+        my @ready = $select->can_read;
 
         for my $socket (@ready) {
             my $session;
@@ -307,6 +355,18 @@ sub listen {
             if ($socket == $server_socket) { # new SIP client
 
                 my $client = $server_socket->accept;
+
+                if ($self->config->{max_clients} &&
+                    $self->client_count >= $self->config->{max_clients}) {
+
+                    $client->shutdown(2);
+                    $client->close;
+                    syslog(LOG_WARNING => 
+                        "SIP client rejected because the server has ".
+                        "reached max_clients=".$self->config->{max_clients});
+
+                    next;
+                }
 
                 $session =
                     SIP2Mediator::Server::Session->new($self->config, $client);
@@ -321,6 +381,9 @@ sub listen {
                     $select->remove($session->sip_socket);
                     $select->remove($session->http_socket);
                     $session->cleanup;
+
+                } else {
+                    $in_flight++;
                 }
 
             } elsif ($session = # new HTTP response
@@ -330,6 +393,9 @@ sub listen {
                     $select->remove($session->sip_socket);
                     $select->remove($session->http_socket);
                     $session->cleanup;
+
+                } else {
+                    $in_flight--;
                 }
 
                 if ($session->http_dead) {

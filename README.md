@@ -11,8 +11,25 @@ sudo cpan URL::Encode::XS
 
 ### Usage
 
+#### Running the SIP2Mediator
+
 ```sh
 PERL5LIB=lib bin/sip2-mediator --help
+
+PERL5LIB=lib bin/sip2-mediator  \
+    --sip-address 127.0.0.1     \
+    --sip-port 6001             \
+    --http-host 127.0.0.1       \
+    --http-proto http           \
+    --http-path /sip2-mediator  \
+    --max-clients 120           \
+    --syslog-facility LOCAL4
+```
+
+#### Graceful Shutdown
+
+```sh
+kill -s USR1 <sip2-mediator-pid>
 ```
 
 ### About
@@ -75,7 +92,8 @@ PERL5LIB=lib bin/sip2-client    \
 * Reduce system requirements for SIP servers
 * Support load distrubution across an Evergreen cluster
 * Support graceful SIP server detachment
-* Support SIP configuration reloading
+* Allow for most configuration changes (e.g. adding SIP accounts) without 
+  having to restart the SIP server, which can cause interruptions.
 * Decouple SIP accounts from ILS accounts
 * Move SIP configuration into the Evergreen database
 * Reduce SIP message layer abstraction to ease modification.
