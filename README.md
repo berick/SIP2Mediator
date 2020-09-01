@@ -49,8 +49,8 @@ SIP Client <=> SIP <=> SIP2Mediator <=> JSON <=> HTTP Server
 
 ### SIP Messages as JSON
 
-* Message are encoded as JSON Objects with a "code", "fixed\_fields", 
-  and optionally "fields" keys.
+* Message exchanged with the HTTP back-end are encoded as JSON Objects
+  with a "code", "fixed\_fields", and optionally "fields" keys.
 
 Example SIP Login Message
 
@@ -93,17 +93,17 @@ PERL5LIB=lib bin/sip2-client    \
 * Support load distrubution across an Evergreen cluster
 * Support graceful SIP server detachment
 * Allow for most configuration changes (e.g. adding SIP accounts) without 
-  having to restart the SIP server, which can cause interruptions.
+  having to restart the SIP server.
 * Decouple SIP accounts from ILS accounts
 * Move SIP configuration into the Evergreen database
 * Reduce SIP message layer abstraction to ease modification.
-* Support SIP actions via direct HTTPS, bypassing the mediator.
 * BONUS: In scenarios where sip2-mediator may be run alongside SIP
   clients, SIP traffic to/from EG traffic may be encrypted by HTTPS.
+* BONUS: SIP actions may be performed via direct HTTPS, bypassing 
+  wire-level SIP altogether.
 
 ### Current Evergreen Working Branch
 
 https://github.com/berick/Evergreen/tree/sip2-mediator
-
 
 
