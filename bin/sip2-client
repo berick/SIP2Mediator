@@ -20,10 +20,12 @@ my $sip_password;
 my $institution;
 my @messages;
 
+my $current_location; # library name/code
 my $item_barcode;
 my $patron_barcode;
 my $patron_password;
 my $patron_summary = ' 'x10;
+my $with_cancel;
 
 sub usage {
     my $exit = shift || 0;
@@ -55,6 +57,10 @@ Options:
     --sip-username <username>
     --sip-password <password>
 
+    --current-location <library-code>
+        Branch name/code that indicates the physical location of the
+        SIP action.
+
     --item-barcode <barcode>
     --patron-barcode <barcode>
     --patron-password <password>
@@ -63,15 +69,17 @@ Options:
         Override the 'patron summary' string for the Patron Information
         request.  Useful for requesting additional data in the response.
         E.g. to request hold items: --patron-summary "Y         "
-        
 
+    --with-cancel
+        Send the SIP 'BI' ("cancel") field during checkin or checkout.
+        
     --message <message-name>; repeatable
         Supported values:
         'sc-status'
         'item-information'
         'patron-information'
         'patron-status'
-        TODO ADD MORE
+        'checkin'
 USAGE
 
     warn "\n! $msg !\n" if $msg;
@@ -125,6 +133,25 @@ sub item_information {
     });
 }
 
+sub checkin {
+    die "--item-barcode required for checkin\n" unless $item_barcode;
+
+    send_recv({
+        code => '09',
+        fixed_fields => [
+            'N', 
+            SIP2Mediator::Spec->sip_date,
+            SIP2Mediator::Spec->sip_date
+        ],
+        fields => [
+            {AP => $current_location},
+            {AO => $institution}, 
+            {AB => $item_barcode},
+            $with_cancel ? {BI => 'Y'} : ()
+        ]
+    });
+}
+
 sub patron_status {
 
     die "--patron-barcode required for patron-status\n" unless $patron_barcode;
@@ -162,12 +189,14 @@ GetOptions(
     'sip-username=s'    => \$sip_username,
     'sip-password=s'    => \$sip_password,
     'institution=s'     => \$institution,
+    'current-location=s'=> \$current_location,
     'item-barcode=s'    => \$item_barcode,
     'patron-barcode=s'  => \$patron_barcode,
     'patron-password=s' => \$patron_password,
     'patron-summary=s'  => \$patron_summary,
+    'with-cancel'       => \$with_cancel,
     'message=s'         => \@messages,
-    'help'               => sub { usage(0); }
+    'help'              => sub { usage(0); }
 ) or usage(1);
 
 usage(1, "--sip-address required")  unless $sip_address;
@@ -177,7 +206,6 @@ usage(1, "--sip-password required") unless $sip_password;
 usage(1, "--institution required")  unless $institution;
 usage(1, "Patron summary string must be 10 characters")
     if ($patron_summary && length($patron_summary) != 10);
-
 
 $client = SIP2Mediator::Client->new({
     sip_address => $sip_address,
@@ -193,6 +221,7 @@ for my $msg (@messages) {
     item_information() if $msg eq 'item-information';
     patron_information() if $msg eq 'patron-information';
     patron_status() if $msg eq 'patron-status';
+    checkin() if $msg eq 'checkin';
 }
 
 $client->disconnect;

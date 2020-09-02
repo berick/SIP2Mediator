@@ -97,6 +97,7 @@ PERL5LIB=lib bin/sip2-client    \
 * Decouple SIP accounts from ILS accounts
 * Move SIP configuration into the Evergreen database
 * Reduce SIP message layer abstraction to ease modification.
+* Back-end SIP API which survives front-end changes.
 * BONUS: In scenarios where sip2-mediator may be run alongside SIP
   clients, SIP traffic to/from EG traffic may be encrypted by HTTPS.
 * BONUS: SIP actions may be performed via direct HTTPS, bypassing 
