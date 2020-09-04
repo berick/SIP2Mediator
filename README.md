@@ -34,7 +34,7 @@ kill -s USR1 <sip2-mediator-pid>
 
 ### About
 
-SIP2Mediator is a SIP2 server which mediates SIP requests between
+SIP2Mediator is a SIP2 server which relays SIP requests between
 SIP clients and a JSON/HTTP backend.  The mediator is a single-cpu,
 single-thread application which processes network data on a first come
 first served basis via select loop.
@@ -45,7 +45,7 @@ it can integrate with any ILS which provides the required HTTP back-end.
 
 ### Data Flow
 
-SIP Client <=> SIP <=> SIP2Mediator <=> JSON <=> HTTP Server
+SIP Client <=> SIP <=> SIP2Mediator <=> JSON <=> HTTP Server <=> ILS Data <=> ILS
 
 ### SIP Messages as JSON
 
@@ -92,11 +92,11 @@ PERL5LIB=lib bin/sip2-client    \
 * Reduce system requirements for SIP servers
 * Support load distrubution across an Evergreen cluster
 * Support graceful SIP server detachment
-* Allow for most configuration changes (e.g. adding SIP accounts) without 
+* Allow for configuration changes (e.g. adding SIP accounts) without 
   having to restart the SIP server.
 * Decouple SIP accounts from ILS accounts
 * Move SIP configuration into the Evergreen database
-* Reduce SIP message layer abstraction to ease modification.
+* Reduce SIP message layer abstraction to ease customization.
 * Back-end SIP API which survives front-end changes.
 * BONUS: In scenarios where sip2-mediator may be run alongside SIP
   clients, SIP traffic to/from EG traffic may be encrypted by HTTPS.

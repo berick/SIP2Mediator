@@ -192,7 +192,7 @@ sub read_http_socket {
     # data is ready for reading.  However, if read_response_headers is
     # called and no data is there, Net::HTTP::NB will raise an error.
     # Catch the error and mark the current HTTP socket as dead so a new
-    # one can be created. # Note that $sock->connected still shows as
+    # one can be created. Note that $sock->connected still shows as
     # true in such cases.
     eval { ($code, $mess, %headers) = $sock->read_response_headers };
 
