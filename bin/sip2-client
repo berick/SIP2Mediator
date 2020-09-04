@@ -20,7 +20,9 @@ my $sip_password;
 my $institution;
 my @messages;
 my $repeat = 1;
+my $sleep;
 my $summarize;
+my $silent;
 
 my $current_location; # library name/code
 my $item_barcode;
@@ -87,8 +89,15 @@ Options:
         Repeat each --message this many times.  Useful for load testing.
         This is equivalent to passing multiple --message values.
 
+    --sleep <seconds>
+        Sleep this long between requests.  Useful for spreading load
+        in a more realistic way.
+
     --summarize
         Print limited summary information instead of SIP messages
+
+    --silent
+        Don't print anything.
 
 USAGE
 
@@ -103,11 +112,13 @@ sub send_recv {
     my $msg = SIP2Mediator::Message->from_hash($msg_hash);
     $| = 1;
 
-    if ($summarize) {
-        print '+';
-    } else {
-        print sprintf("[SENDING]\n%s\n----------------\n", 
-            $pretty_print ? $msg->to_str : $msg->to_sip);
+    if (!$silent) {
+        if ($summarize) {
+            print '+';
+        } else {
+            print sprintf("[SENDING]\n%s\n----------------\n", 
+                $pretty_print ? $msg->to_str : $msg->to_sip);
+        }
     }
 
     my $start = time();
@@ -118,11 +129,13 @@ sub send_recv {
 
     die "No response received!\n" unless $resp;
 
-    if ($summarize) {
-        print '-';
-    } else {
-        print sprintf("[RECEIVED, duration: %s]:\n%s\n----------------\n", 
-            $duration, $pretty_print ? $resp->to_str : $resp->to_sip);
+    if (!$silent) {
+        if ($summarize) {
+            print '-';
+        } else {
+            print sprintf("[RECEIVED, duration: %s]:\n%s\n----------------\n", 
+                $duration, $pretty_print ? $resp->to_str : $resp->to_sip);
+        }
     }
 }
 
@@ -216,7 +229,9 @@ GetOptions(
     'with-cancel'       => \$with_cancel,
     'message=s'         => \@messages,
     'repeat=s'          => \$repeat,
+    'sleep=s'           => \$sleep,
     'summarize'         => \$summarize,
+    'silent'            => \$silent,
     'help'              => sub { usage(0); }
 ) or usage(1);
 
@@ -245,10 +260,11 @@ for my $msg (@messages) {
         patron_information() if $msg eq 'patron-information';
         patron_status() if $msg eq 'patron-status';
         checkin() if $msg eq 'checkin';
+        sleep($sleep) if $sleep;
     }
 }
 my $duration = time() - $start;
-print sprintf("\nRun time: %0.3f\n", $duration);
+print sprintf("\nRun time: %0.3f\n", $duration) unless $silent;
 
 $client->disconnect;
 
