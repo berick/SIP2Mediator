@@ -19,6 +19,8 @@ my $sip_username;
 my $sip_password;
 my $institution;
 my @messages;
+my $repeat = 1;
+my $summarize;
 
 my $current_location; # library name/code
 my $item_barcode;
@@ -80,6 +82,14 @@ Options:
         'patron-information'
         'patron-status'
         'checkin'
+
+    --repeat <count>
+        Repeat each --message this many times.  Useful for load testing.
+        This is equivalent to passing multiple --message values.
+
+    --summarize
+        Print limited summary information instead of SIP messages
+
 USAGE
 
     warn "\n! $msg !\n" if $msg;
@@ -91,9 +101,14 @@ sub send_recv {
     my $msg_hash = shift;
 
     my $msg = SIP2Mediator::Message->from_hash($msg_hash);
+    $| = 1;
 
-    print sprintf("[SENDING]\n%s\n----------------\n", 
-        $pretty_print ? $msg->to_str : $msg->to_sip);
+    if ($summarize) {
+        print '+';
+    } else {
+        print sprintf("[SENDING]\n%s\n----------------\n", 
+            $pretty_print ? $msg->to_str : $msg->to_sip);
+    }
 
     my $start = time();
     $client->send($msg);
@@ -103,8 +118,12 @@ sub send_recv {
 
     die "No response received!\n" unless $resp;
 
-    print sprintf("[RECEIVED, duration: %s]:\n%s\n----------------\n", 
-        $duration, $pretty_print ? $resp->to_str : $resp->to_sip);
+    if ($summarize) {
+        print '-';
+    } else {
+        print sprintf("[RECEIVED, duration: %s]:\n%s\n----------------\n", 
+            $duration, $pretty_print ? $resp->to_str : $resp->to_sip);
+    }
 }
 
 sub login {
@@ -196,6 +215,8 @@ GetOptions(
     'patron-summary=s'  => \$patron_summary,
     'with-cancel'       => \$with_cancel,
     'message=s'         => \@messages,
+    'repeat=s'          => \$repeat,
+    'summarize'         => \$summarize,
     'help'              => sub { usage(0); }
 ) or usage(1);
 
@@ -216,13 +237,18 @@ die "Client unable to connect\n" unless $client->connect;
 
 login();
 
+my $start = time();
 for my $msg (@messages) {
-    sc_status() if $msg eq 'sc-status';
-    item_information() if $msg eq 'item-information';
-    patron_information() if $msg eq 'patron-information';
-    patron_status() if $msg eq 'patron-status';
-    checkin() if $msg eq 'checkin';
+    for (0 .. $repeat) {
+        sc_status() if $msg eq 'sc-status';
+        item_information() if $msg eq 'item-information';
+        patron_information() if $msg eq 'patron-information';
+        patron_status() if $msg eq 'patron-status';
+        checkin() if $msg eq 'checkin';
+    }
 }
+my $duration = time() - $start;
+print sprintf("\nRun time: %0.3f\n", $duration);
 
 $client->disconnect;
 
