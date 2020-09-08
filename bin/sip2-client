@@ -254,7 +254,7 @@ login();
 
 my $start = time();
 for my $msg (@messages) {
-    for (0 .. $repeat) {
+    for (0 .. ($repeat - 1)) {
         sc_status() if $msg eq 'sc-status';
         item_information() if $msg eq 'item-information';
         patron_information() if $msg eq 'patron-information';

@@ -22,6 +22,8 @@ use Digest::MD5 qw/md5_hex/;
 use SIP2Mediator::Spec;
 use Sys::Syslog qw(syslog);
 use URL::Encode::XS qw/url_encode_utf8/;
+use Encode;
+use Unicode::Normalize;
 
 my %sip_socket_map;
 my %http_socket_map;
@@ -143,7 +145,7 @@ sub read_sip_socket {
     };    
 
     local $/ = SIP2Mediator::Spec::LINE_TERMINATOR;
-    my $sip_txt = readline($self->sip_socket);
+    my $sip_txt = decode_utf8(readline($self->sip_socket));
 
     unless ($sip_txt) {
         syslog(LOG_DEBUG => "[$sclient] SIP client disconnected");
@@ -245,6 +247,15 @@ sub relay_sip_response {
         syslog(LOG_DEBUG => "SIP client [$sclient] disconnected prematurely");
         $self->dead(1);
     };    
+
+    if ($self->config->{ascii}) {
+        # Normalize and strip combining characters.
+        $sip_txt = NFD($sip_txt);
+        $sip_txt =~ s/\pM+//og;
+        $sip_txt = encode('ascii', $sip_txt);
+    } else {
+        $sip_txt = encode_utf8($sip_txt);
+    }
 
     $self->sip_socket->print($sip_txt);
 
