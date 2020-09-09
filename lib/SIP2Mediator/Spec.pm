@@ -271,6 +271,9 @@ $FSpec::patron_class       = $STSF->new('PC', $l->get('patron class'));
 $FSpec::register_login     = $STSF->new('OR', $l->get('register login'));
 $FSpec::check_number       = $STSF->new('RN', $l->get('check number'));
 
+# Evergreen ILS Extensions
+$FSpec::internal_id        = $STSF->new('XI', $l->get('patron internal id'));
+
 # --- Message Definitions ---------------------------------------------------
 
 package MSpec;
