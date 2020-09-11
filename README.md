@@ -95,6 +95,7 @@ PERL5LIB=lib bin/sip2-client    \
 * Allow for configuration changes (e.g. adding SIP accounts) without 
   having to restart the SIP server.
 * Decouple SIP accounts from ILS accounts
+* Decouple institution IDs from configuration settings.
 * Move SIP configuration into the Evergreen database
 * Reduce SIP message layer abstraction to ease customization.
 * Back-end SIP API which survives front-end changes.
