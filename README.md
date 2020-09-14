@@ -5,7 +5,7 @@
 ### Install Prerequisites (Ubuntu)
 
 ```sh
-sudo apt install build-essential libjson-xs-perl libnet-https-nb-perl
+sudo apt install build-essential libjson-xs-perl libnet-https-nb-perl libdatetime-perl
 sudo cpan URL::Encode::XS
 ```
 
