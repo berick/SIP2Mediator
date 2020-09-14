@@ -342,7 +342,7 @@ sub listen {
 
             if ($server_socket) { 
                 # Shut down the server socket to prevent new connections.
-                # Clienet sockets will be shut down once it's safe to
+                # Client sockets will be shut down once it's safe to
                 # complete the graceful shutdown.
                 $select->remove($server_socket);
                 $server_socket->shutdown(2);

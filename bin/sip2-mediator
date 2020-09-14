@@ -44,28 +44,28 @@ Synopsis:
 
 Options:
 
-    --sip_address <$sip_address>
+    --sip-address <$sip_address>
         Listen address for SIP server.
 
-    --sip_port <$sip_port>
+    --sip-port <$sip_port>
         List port for SIP server.
 
-    --http_host <$http_host>
+    --http-host <$http_host>
         Hostname of HTTP API server.
 
-    --http_port <$http_port>
+    --http-port <$http_port>
         Port for HTTP API server.
 
-    --http_proto <$http_proto>
+    --http-proto <$http_proto>
         Protocoal for HTTP API server. http or https.
         
-    --http_path <$http_path>
+    --http-path <$http_path>
         URL path for HTTP API server
 
-    --max_clients <$max_clients>
+    --max-clients <$max_clients>
         Maximum number of SIP client connections allowed.
 
-    --syslog_facility <$syslog_facility>
+    --syslog-facility <$syslog_facility>
 
     --ascii
         Normalized and encode data returned to SIP clients as ASCII.
