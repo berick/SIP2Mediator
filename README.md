@@ -89,16 +89,17 @@ PERL5LIB=lib bin/sip2-client    \
 
 ### Project Goals
 
+* Decouple ILS implementation from SIP server.
+* Decouple SIP accounts from ILS accounts
+* Back-end SIP API which survives front-end changes.
 * Reduce system requirements for SIP servers
 * Support load distrubution across an Evergreen cluster
-* Support graceful SIP server detachment
+* Support graceful-ish SIP server detachment
+* Move SIP configuration into the Evergreen database
 * Allow for configuration changes (e.g. adding SIP accounts) without 
   having to restart the SIP server.
-* Decouple SIP accounts from ILS accounts
 * Decouple institution IDs from configuration settings.
-* Move SIP configuration into the Evergreen database
 * Reduce SIP message layer abstraction to ease customization.
-* Back-end SIP API which survives front-end changes.
 * Option to suppress SIP fields in response for patron privacy.
 * BONUS: In scenarios where sip2-mediator may be run alongside SIP
   clients, SIP traffic to/from EG traffic may be encrypted by HTTPS.
