@@ -93,12 +93,27 @@ sub from_http_socket {
 
 sub cleanup {
     my $self = shift;
+
     delete $sip_socket_map{$self->sip_socket};
     delete $http_socket_map{$self->http_socket};
+
+    if ($self->http_socket) {
+        # Let the HTTP backend know we are shutting down so it can
+        # clean up any session data.
+        my $sclient = $self->sip_socket_str;
+        syslog(LOG_DEBUG => 
+            "[$sclient] Sending End Session message to HTTP backend");
+
+        $self->relay_sip_request(
+            SIP2Mediator::Message->from_hash({code => 'XS'}));
+    }
+
     $self->sip_socket->shutdown(2);
     $self->http_socket->shutdown(2);
     $self->sip_socket->close;
     $self->http_socket->close;
+    delete $self->{http_socket};
+    delete $self->{sip_socket};
 }
 
 sub seskey {
@@ -391,6 +406,7 @@ sub listen {
                 if ($session->dead || !$session->read_sip_socket) {
                     $select->remove($session->sip_socket);
                     $select->remove($session->http_socket);
+                    # SIP client disconnected
                     $session->cleanup;
 
                 } else {

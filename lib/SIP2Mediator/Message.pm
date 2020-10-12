@@ -159,7 +159,7 @@ sub from_hash {
     # message code and fixed fields.
     my $txt = sprintf('%s%s',
         $hash->{code},
-        join('', @{$hash->{fixed_fields}})
+        join('', @{$hash->{fixed_fields} || []})
     );
 
     my $msg = $class->from_sip($txt);
