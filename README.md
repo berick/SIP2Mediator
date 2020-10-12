@@ -105,6 +105,7 @@ PERL5LIB=lib bin/sip2-client    \
   clients, SIP traffic to/from EG traffic may be encrypted by HTTPS.
 * BONUS: SIP actions may be performed via direct HTTPS, bypassing 
   wire-level SIP altogether.
+* BONUS: Testing SIP changes via srfsh
 
 ### Current Evergreen Working Branch
 
