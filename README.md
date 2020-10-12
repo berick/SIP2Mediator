@@ -100,7 +100,8 @@ PERL5LIB=lib bin/sip2-client    \
   having to restart the SIP server.
 * Decouple institution IDs from configuration settings.
 * Reduce SIP message layer abstraction to ease customization.
-* Option to suppress SIP fields in response for patron privacy.
+* Support persistent and transient SIP clients
+* Option to suppress SIP fields in response for patron privacy. (pending)
 * BONUS: In scenarios where sip2-mediator may be run alongside SIP
   clients, SIP traffic to/from EG traffic may be encrypted by HTTPS.
 * BONUS: SIP actions may be performed via direct HTTPS, bypassing 
