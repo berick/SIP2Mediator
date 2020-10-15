@@ -107,6 +107,9 @@ PERL5LIB=lib bin/sip2-client    \
 * BONUS: SIP actions may be performed via direct HTTPS, bypassing 
   wire-level SIP altogether.
 * BONUS: Testing SIP changes via srfsh
+```sh
+srfsh# request open-ils.sip2 open-ils.sip2.request "randomkey", {"code":"93","fields":[{"CN":"sipuser"}, {"CO":"sippass"}]}
+```
 
 ### Current Evergreen Working Branch
 
