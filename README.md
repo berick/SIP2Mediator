@@ -54,6 +54,10 @@ SIP Client <=> SIP <=> SIP2Mediator <=> JSON <=> HTTP Server <=> ILS Data <=> IL
 
 Example SIP Login Message
 
+```sh
+9300|CNsip_username|COsip_password
+```
+
 ```json
 {                                                              
   "code": 93,                                                            
