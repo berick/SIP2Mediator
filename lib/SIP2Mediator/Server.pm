@@ -34,7 +34,8 @@ sub new {
     my $self = {
         seskey => md5_hex(time."$$".rand()),
         sip_socket => $sip_socket,
-        config => $config
+        config => $config,
+        prev_sip_message => undef
     };
 
     $self = bless($self, $class);
@@ -46,6 +47,13 @@ sub new {
     syslog(LOG_DEBUG => "[$sclient] New SIP client connecting");
 
     return $self;
+}
+
+sub prev_sip_message {
+    my $self = shift;
+    my $prev = shift;
+    $self->{prev_sip_message} = $prev if defined $prev;
+    return $self->{prev_sip_message};
 }
 
 sub config {
@@ -78,7 +86,19 @@ sub create_http_socket {
         $self->{http_socket} = Net::HTTPS::NB->new(%http_args);
     }
 
+    my $sclient = $self->sip_socket_str;
+    syslog(LOG_DEBUG => 
+        "[$sclient] SIP client using HTTP(S) with local port " . 
+        $self->http_socket->sockport);
+
     $http_socket_map{$self->http_socket} = $self;
+
+    if ($self->prev_sip_message) {
+        syslog(LOG_DEBUG => 
+            "[$sclient] Re-sending SIP request after HTTP timeout");
+        $self->relay_sip_request($self->prev_sip_message);
+        $self->prev_sip_message(0);
+    }
 }
 
 sub from_sip_socket {
@@ -180,6 +200,8 @@ sub read_sip_socket {
         syslog(LOG_DEBUG => "[$sclient] sent invalid SIP: $sip_txt");
         return 0;
     }
+
+    $self->prev_sip_message($msg);
 
     return $self->relay_sip_request($msg);
 }
@@ -377,6 +399,9 @@ sub listen {
 
         for my $socket (@ready) {
             my $session;
+
+            #syslog(LOG_DEBUG => "Socket active at peerport " . 
+            #    $socket->peerport . " and local port " . $socket->sockport);
 
             if ($socket == $server_socket) { # new SIP client
 
