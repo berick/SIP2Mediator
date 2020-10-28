@@ -25,6 +25,10 @@ my $http_host       = '127.0.0.1';
 my $http_port       = 80;
 my $http_proto      = 'http';
 my $http_path       = '/sip2-mediator';
+my $http_method     = 'POST';
+my $sess_param      = 'session';
+my $mess_param      = 'message';
+my $response_jpath  = '';
 my $max_clients     = 120;
 my $syslog_facility = 'LOCAL0';
 my $ascii           = 0;
@@ -61,6 +65,27 @@ Options:
         
     --http-path <$http_path>
         URL path for HTTP API server
+        To use the Evergreen gateway directly, use
+        "/gateway?service=open-ils.sip2&method=open-ils.sip2.request".
+
+    --http-method <$http_method>
+        HTTP method to use with the server
+        To use the Evergreen gateway directly, use
+        "GET".
+
+    --session-param <$sess_param>
+        CGI parameter name to pass the session key
+        To use the Evergreen gateway directly, use
+        "param".
+
+    --message-param <$mess_param>
+        CGI parameter name to pass the SIP2 message
+        To use the Evergreen gateway directly, use
+        "param".
+
+    --response-json-path <$response_jpath>
+        JSON Path expression used to extract the result message
+        from the HTTP response.  For Evergreen use "\$.payload[0]".
 
     --max-clients <$max_clients>
         Maximum number of SIP client connections allowed.
@@ -80,17 +105,21 @@ USAGE
 }
 
 GetOptions(
-    'sip-address=s'     => \$sip_address,
-    'sip-port=s'        => \$sip_port,
-    'http-host=s'       => \$http_host,
-    'http-port=s'       => \$http_port,
-    'http-proto=s'      => \$http_proto,
-    'http-path=s'       => \$http_path,
-    'max-clients=s'     => \$max_clients,
-    'syslog-facility=s' => \$syslog_facility,
-    'daemonize'         => \$daemonize,
-    'ascii'             => \$ascii,
-    'help'              => sub { usage(0); }
+    'sip-address=s'        => \$sip_address,
+    'sip-port=s'           => \$sip_port,
+    'http-host=s'          => \$http_host,
+    'http-port=s'          => \$http_port,
+    'http-proto=s'         => \$http_proto,
+    'http-path=s'          => \$http_path,
+    'http-method=s'        => \$http_method,
+    'session-param=s'      => \$sess_param,
+    'message-param=s'      => \$mess_param,
+    'response-json-path=s' => \$response_jpath,
+    'max-clients=s'        => \$max_clients,
+    'syslog-facility=s'    => \$syslog_facility,
+    'daemonize'            => \$daemonize,
+    'ascii'                => \$ascii,
+    'help'                 => sub { usage(0); }
 ) or usage(1);
 
 my $mediator = SIP2Mediator::Server->new({
@@ -100,6 +129,9 @@ my $mediator = SIP2Mediator::Server->new({
     http_port       => $http_port,
     http_proto      => $http_proto,
     http_path       => $http_path,
+    session_param   => $sess_param,
+    message_param   => $sess_param,
+    response_jpath  => $response_jpath,
     max_clients     => $max_clients,
     syslog_facility => $syslog_facility,
     ascii           => $ascii

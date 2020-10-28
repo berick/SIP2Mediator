@@ -208,13 +208,23 @@ sub read_sip_socket {
 
 sub relay_sip_request {
     my ($self, $msg) = @_;
+    my $sess_param = $self->config->{session_param} || 'session';
+    my $mess_param = $self->config->{message_param} || 'message';
+    my $http_method = $self->config->{http_method} || 'POST';
 
-    my $post = sprintf('session=%s&message=%s',
-        $self->seskey, url_encode_utf8($msg->to_json));
+    my $post = sprintf('%s=%s&%s=%s',
+        $sess_param, $self->seskey, $mess_param, url_encode_utf8($msg->to_json));
 
-    #syslog(LOG_INFO => "POST: $post");
+    my $path = $self->config->{http_path};
+    if ($http_method eq 'GET') {
+        $path .= ($path =~ /\?/) ? '&' : '?';
+        $path .= $post;
+        $post = undef;
+    }
 
-    $self->http_socket->write_request(POST => $self->config->{http_path}, $post);
+    #syslog(LOG_INFO => "$http_method: $post");
+
+    $self->http_socket->write_request($http_method => $path, $post);
 
     return 1;
 }
@@ -267,7 +277,7 @@ sub read_http_socket {
 
     #syslog(LOG_DEBUG => "[$sclient] HTTP response: $content");
 
-    my $msg = SIP2Mediator::Message->from_json($content);
+    my $msg = SIP2Mediator::Message->from_json($content, $self->config->{response_jpath});
 
     if (!$msg) {
         syslog('LOG_ERR', "SIP HTTP backend returned unusable data: $content");

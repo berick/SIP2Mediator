@@ -17,6 +17,7 @@ use strict; use warnings;
 use Locale::gettext;
 use JSON::XS;
 use Sys::Syslog qw(syslog);
+use JSON::Path qw/jpath1/;
 use SIP2Mediator::Spec;
 use SIP2Mediator::Field;
 use SIP2Mediator::FixedField;
@@ -154,11 +155,12 @@ sub to_json {
 }
 
 sub from_json {
-    my ($class, $msg_json) = @_;
+    my ($class, $msg_json, $jpath) = @_;
 
     return undef unless $msg_json;
 
     my $hash = $json->decode($msg_json);
+    $hash = jpath1($hash, $jpath) if $jpath;
 
     return $class->from_hash($hash);
 }
