@@ -98,6 +98,7 @@ Options:
         'patron-information'
         'patron-status'
         'checkin'
+        'checkout'
 
     --repeat <count>
         Repeat each --message this many times.  Useful for load testing.
@@ -176,6 +177,28 @@ sub item_information {
         code => 17,
         fixed_fields => [SIP2Mediator::Spec->sip_date],
         fields => [{AO => $institution}, {AB => $item_barcode}]
+    });
+}
+
+sub checkout {
+
+    die "--patron-barcode and --item-barcode required for checkout\n" 
+        unless $patron_barcode && $item_barcode;
+
+    send_recv({
+        code => '11',
+        fixed_fields => [
+            'N', # renewal policy
+            'N', # no-block
+            SIP2Mediator::Spec->sip_date,
+            SIP2Mediator::Spec->sip_date
+        ],
+        fields => [
+            {AO => $institution}, 
+            {AA => $patron_barcode},
+            {AB => $item_barcode},
+            $patron_password ? {AD => $patron_password} : ()
+        ]
     });
 }
 
@@ -273,6 +296,7 @@ for my $msg (@messages) {
         item_information() if $msg eq 'item-information';
         patron_information() if $msg eq 'patron-information';
         patron_status() if $msg eq 'patron-status';
+        checkout() if $msg eq 'checkout';
         checkin() if $msg eq 'checkin';
         sleep($sleep) if $sleep;
     }
