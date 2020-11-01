@@ -155,14 +155,19 @@ sub from_json {
 sub from_hash {
     my ($class, $hash) = @_;
 
+    return undef unless $hash && $hash->{code};
+    my @fixed_fields = @{$hash->{fixed_fields} ||= []};
+
+    syslog('LOG_WARNING', "Fixed fields contain undefined values: @fixed_fields")
+        if grep {!defined $_} @fixed_fields;
+
     # Start with a SIP message string which contains only the 
     # message code and fixed fields.
-    my $txt = sprintf('%s%s',
-        $hash->{code},
-        join('', @{$hash->{fixed_fields} || []})
-    );
+    my $txt = sprintf('%s%s', $hash->{code}, join('', @fixed_fields));
 
     my $msg = $class->from_sip($txt);
+
+    return undef unless $msg;
 
     # Then add the variable length Fields
     
