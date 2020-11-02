@@ -44,6 +44,11 @@ my $patron_barcode;
 my $patron_password;
 my $patron_summary = ' 'x10;
 my $with_cancel;
+my $fee_identifier;
+my $fee_amount;
+my $fee_type = '01'; # unknown
+my $payment_type = '00'; # cash
+my $currency_type = 'USD'; 
 
 sub usage {
     my $exit = shift || 0;
@@ -88,6 +93,22 @@ Options:
         request.  Useful for requesting additional data in the response.
         E.g. to request hold items: --patron-summary "Y         "
 
+    --fee-identifier <value>
+        fee-payment message will apply the payment to this specific
+        ILS transaction/fee identifier value.
+
+    --fee-amount <amount>
+        Amount to pay toward the specified transaction(s).
+
+    --fee-type <2-char-code>
+        SIP fee type specifier.  Defaults to '01' (unknown)
+
+    --payment-type <2-char-code>
+        SIP payment type specifier.  Defaults to '00' (cash)
+
+    --currency-type <3-char-currency>
+        SIP currency type.  Defaults to $currency_type;
+
     --with-cancel
         Send the SIP 'BI' ("cancel") field during checkin or checkout.
         
@@ -99,6 +120,7 @@ Options:
         'patron-status'
         'checkin'
         'checkout'
+        'fee-payment'
 
     --repeat <count>
         Repeat each --message this many times.  Useful for load testing.
@@ -251,6 +273,28 @@ sub patron_information {
     });
 }
 
+sub fee_payment {
+
+    die "fee-payment requires --patron-barcode and --fee-amount"
+        unless $patron_barcode && $fee_amount;
+
+    send_recv({
+        code => '37',
+        fixed_fields => [
+            SIP2Mediator::Spec->sip_date,
+            $fee_type,
+            $payment_type,
+            $currency_type
+        ],
+        fields => [
+            {AO => $institution}, 
+            {AA => $patron_barcode},
+            {BV => $fee_amount},
+            {CG => $fee_identifier}
+        ]
+    });
+}
+
 GetOptions(
     'pretty-print'      => \$pretty_print,
     'sip-address=s'     => \$sip_address,
@@ -264,6 +308,11 @@ GetOptions(
     'patron-password=s' => \$patron_password,
     'patron-summary=s'  => \$patron_summary,
     'with-cancel'       => \$with_cancel,
+    'fee-identifier=s'  => \$fee_identifier,
+    'fee-amount=s'      => \$fee_amount,
+    'fee-type=s'        => \$fee_type,
+    'payment-type=s'    => \$payment_type,
+    'currency-type=s'   => \$currency_type,
     'message=s'         => \@messages,
     'repeat=s'          => \$repeat,
     'sleep=s'           => \$sleep,
@@ -290,14 +339,15 @@ die "Client unable to connect\n" unless $client->connect;
 login();
 
 my $start = time();
-for my $msg (@messages) {
-    for (0 .. ($repeat - 1)) {
+for (0 .. ($repeat - 1)) {
+    for my $msg (@messages) {
         sc_status() if $msg eq 'sc-status';
         item_information() if $msg eq 'item-information';
         patron_information() if $msg eq 'patron-information';
         patron_status() if $msg eq 'patron-status';
         checkout() if $msg eq 'checkout';
         checkin() if $msg eq 'checkin';
+        fee_payment() if $msg eq 'fee-payment';
         sleep($sleep) if $sleep;
     }
 }
