@@ -170,7 +170,6 @@ sub from_hash {
     # message code and fixed fields.
     my $txt = sprintf('%s%s', $hash->{code}, join('', @fixed_fields));
 
-    print "$txt\n";
     my $msg = $class->from_sip($txt);
 
     return undef unless $msg;

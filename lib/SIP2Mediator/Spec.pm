@@ -380,6 +380,17 @@ $MSpec::checkout = $STSM->new(
     ]
 );
 
+
+$MSpec::checkout_resp = $STSM->new(
+    '12', $l->get('Checkout Response'), [
+        $FFSpec::ok,
+        $FFSpec::renewal_ok,
+        $FFSpec::magnetic_media,
+        $FFSpec::desensitize,
+        $FFSpec::date
+    ]
+);
+
 $MSpec::renew = $STSM->new(
     '29', $l->get('Renew Request'), [
         $FFSpec::third_party_allowed,
@@ -389,8 +400,8 @@ $MSpec::renew = $STSM->new(
     ]
 );
 
-$MSpec::checkout_resp = $STSM->new(
-    '12', $l->get('Checkout Response'), [
+$MSpec::renew = $STSM->new(
+    '30', $l->get('Renew Response'), [
         $FFSpec::ok,
         $FFSpec::renewal_ok,
         $FFSpec::magnetic_media,
