@@ -189,6 +189,7 @@ $FFSpec::offline_ok          = $STSFF->new(1,  $l->get('offline ok'));
 $FFSpec::timeout_period      = $STSFF->new(3,  $l->get('timeout period'));
 $FFSpec::retries_allowed     = $STSFF->new(3,  $l->get('retries allowed'));
 $FFSpec::date_time_sync      = $STSFF->new(18, $l->get('date/time sync'));
+$FFSpec::third_party_allowed = $STSFF->new(1,  $l->get('third party allowed'));
 
 # --- Variable-Length Field Definitions -------------------------------------
 
@@ -373,6 +374,15 @@ $MSpec::patron_info_resp = $STSM->new(
 $MSpec::checkout = $STSM->new(
     '11', $l->get('Checkout Request'), [
         $FFSpec::sc_renewal_policy,
+        $FFSpec::no_block,
+        $FFSpec::date,
+        $FFSpec::nb_due_date
+    ]
+);
+
+$MSpec::renew = $STSM->new(
+    '29', $l->get('Renew Request'), [
+        $FFSpec::third_party_allowed,
         $FFSpec::no_block,
         $FFSpec::date,
         $FFSpec::nb_due_date

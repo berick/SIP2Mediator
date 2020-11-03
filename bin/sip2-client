@@ -120,6 +120,7 @@ Options:
         'patron-status'
         'checkin'
         'checkout'
+        'renew'
         'fee-payment'
 
     --repeat <count>
@@ -214,6 +215,28 @@ sub checkout {
             'N', # no-block
             SIP2Mediator::Spec->sip_date,
             SIP2Mediator::Spec->sip_date
+        ],
+        fields => [
+            {AO => $institution}, 
+            {AA => $patron_barcode},
+            {AB => $item_barcode},
+            $patron_password ? {AD => $patron_password} : ()
+        ]
+    });
+}
+
+sub renew {
+
+    die "--patron-barcode and --item-barcode required for renew\n" 
+        unless $patron_barcode && $item_barcode;
+
+    send_recv({
+        code => '29',
+        fixed_fields => [
+            'Y', # third party allowed
+            'N', # no-block
+            SIP2Mediator::Spec->sip_date, # trans date
+            SIP2Mediator::Spec->sip_date  # non-block due date
         ],
         fields => [
             {AO => $institution}, 
@@ -346,6 +369,7 @@ for (0 .. ($repeat - 1)) {
         patron_information() if $msg eq 'patron-information';
         patron_status() if $msg eq 'patron-status';
         checkout() if $msg eq 'checkout';
+        renew() if $msg eq 'renew';
         checkin() if $msg eq 'checkin';
         fee_payment() if $msg eq 'fee-payment';
         sleep($sleep) if $sleep;

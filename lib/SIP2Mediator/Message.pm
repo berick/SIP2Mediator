@@ -16,6 +16,7 @@ package SIP2Mediator::Message;
 use strict; use warnings;
 use Locale::gettext;
 use JSON::XS;
+use Sys::Syslog qw(syslog);
 use SIP2Mediator::Spec;
 use SIP2Mediator::Field;
 use SIP2Mediator::FixedField;
@@ -95,9 +96,13 @@ sub from_sip {
     my ($class, $txt) = @_;
 
     my $msg = SIP2Mediator::Message->new;
-    $msg->{spec} = SIP2Mediator::Spec::Message->find_by_code(substr($txt, 0, 2));
+    my $code = substr($txt, 0, 2);
+    $msg->{spec} = SIP2Mediator::Spec::Message->find_by_code($code);
 
-    return undef unless $msg->{spec};
+    if (!$msg->{spec}) {
+        syslog('LOG_WARNING', "Unknown message type: '$code'");
+        return undef;
+    }
 
     $txt = substr($txt, 2);
 
@@ -156,7 +161,7 @@ sub from_hash {
     my ($class, $hash) = @_;
 
     return undef unless $hash && $hash->{code};
-    my @fixed_fields = @{$hash->{fixed_fields} ||= []};
+    my @fixed_fields = @{$hash->{fixed_fields} || []};
 
     syslog('LOG_WARNING', "Fixed fields contain undefined values: @fixed_fields")
         if grep {!defined $_} @fixed_fields;
@@ -165,6 +170,7 @@ sub from_hash {
     # message code and fixed fields.
     my $txt = sprintf('%s%s', $hash->{code}, join('', @fixed_fields));
 
+    print "$txt\n";
     my $msg = $class->from_sip($txt);
 
     return undef unless $msg;
