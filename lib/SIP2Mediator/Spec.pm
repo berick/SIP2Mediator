@@ -190,6 +190,8 @@ $FFSpec::timeout_period      = $STSFF->new(3,  $l->get('timeout period'));
 $FFSpec::retries_allowed     = $STSFF->new(3,  $l->get('retries allowed'));
 $FFSpec::date_time_sync      = $STSFF->new(18, $l->get('date/time sync'));
 $FFSpec::third_party_allowed = $STSFF->new(1,  $l->get('third party allowed'));
+$FFSpec::renewed_count       = $STSFF->new(4,  $l->get('renewed count'));
+$FFSpec::unrenewed_count     = $STSFF->new(4,  $l->get('unrenewed count'));
 
 # --- Variable-Length Field Definitions -------------------------------------
 
@@ -400,12 +402,27 @@ $MSpec::renew = $STSM->new(
     ]
 );
 
-$MSpec::renew = $STSM->new(
+$MSpec::renew_resp = $STSM->new(
     '30', $l->get('Renew Response'), [
         $FFSpec::ok,
         $FFSpec::renewal_ok,
         $FFSpec::magnetic_media,
         $FFSpec::desensitize,
+        $FFSpec::date
+    ]
+);
+
+$MSpec::renew_all = $STSM->new(
+    '65', $l->get('Renew All Request'), [
+        $FFSpec::date
+    ]
+);
+
+$MSpec::renew_all_resp = $STSM->new(
+    '66', $l->get('Renew All Response'), [
+        $FFSpec::ok,
+        $FFSpec::renewed_count,
+        $FFSpec::unrenewed_count,
         $FFSpec::date
     ]
 );
