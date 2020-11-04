@@ -107,6 +107,13 @@ sub from_sip {
     $txt = substr($txt, 2);
 
     for my $ffspec (@{$msg->spec->fixed_fields}) {
+
+        unless (defined $txt && length($txt) >= $ffspec->length) {
+            syslog('LOG_WARNING', 
+                "Fixed fields do not match spec for code $code.  Discarding");
+            return undef;
+        }
+
         my $value = substr($txt, 0, $ffspec->length);
         $txt = substr($txt, $ffspec->length);
         push(@{$msg->fixed_fields}, 

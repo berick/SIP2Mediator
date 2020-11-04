@@ -150,6 +150,8 @@ sub send_recv {
     my $msg = SIP2Mediator::Message->from_hash($msg_hash);
     $| = 1;
 
+    die "Error creating SIP message\n" unless $msg;
+
     if (!$silent) {
         if ($summarize) {
             print '+';
@@ -242,6 +244,23 @@ sub renew {
             {AO => $institution}, 
             {AA => $patron_barcode},
             {AB => $item_barcode},
+            $patron_password ? {AD => $patron_password} : ()
+        ]
+    });
+}
+
+sub renew_all {
+
+    die "--patron-barcode required for renew all\n" unless $patron_barcode;
+
+    send_recv({
+        code => '65',
+        fixed_fields => [
+            SIP2Mediator::Spec->sip_date # trans date
+        ],
+        fields => [
+            {AO => $institution}, 
+            {AA => $patron_barcode},
             $patron_password ? {AD => $patron_password} : ()
         ]
     });
@@ -361,17 +380,25 @@ die "Client unable to connect\n" unless $client->connect;
 
 login();
 
+my $action_map = {
+    'sc-status'          => \&sc_status,
+    'item-information'   => \&item_information,
+    'patron-information' => \&patron_information,
+    'patron-status'      => \&patron_status,
+    'checkout'           => \&checkout,
+    'renew'              => \&renew,
+    'renew-all'          => \&renew_all,
+    'checkin'            => \&checkin,
+    'fee-payment'        => \&fee_payment
+};
+
 my $start = time();
 for (0 .. ($repeat - 1)) {
     for my $msg (@messages) {
-        sc_status() if $msg eq 'sc-status';
-        item_information() if $msg eq 'item-information';
-        patron_information() if $msg eq 'patron-information';
-        patron_status() if $msg eq 'patron-status';
-        checkout() if $msg eq 'checkout';
-        renew() if $msg eq 'renew';
-        checkin() if $msg eq 'checkin';
-        fee_payment() if $msg eq 'fee-payment';
+
+        die "Action '$msg' not supported.\n" unless $action_map->{$msg};
+
+        $action_map->{$msg}->();
         sleep($sleep) if $sleep;
     }
 }
