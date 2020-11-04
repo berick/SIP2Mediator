@@ -315,6 +315,26 @@ sub patron_information {
     });
 }
 
+sub cancel_hold {
+
+    die "--patron-barcode and --item-barcode required for renew\n" 
+        unless $patron_barcode && $item_barcode;
+
+    send_recv({
+        code => '15',
+        fixed_fields => [
+            '-', # cancel
+            SIP2Mediator::Spec->sip_date
+        ],
+        fields => [
+            {AO => $institution}, 
+            {AA => $patron_barcode},
+            {AB => $item_barcode},
+            $patron_password ? {AD => $patron_password} : ()
+        ]
+    });
+}
+
 sub fee_payment {
 
     die "fee-payment requires --patron-barcode and --fee-amount"
@@ -389,10 +409,12 @@ my $action_map = {
     'renew'              => \&renew,
     'renew-all'          => \&renew_all,
     'checkin'            => \&checkin,
+    'cancel-hold'        => \&cancel_hold,
     'fee-payment'        => \&fee_payment
 };
 
 my $start = time();
+
 for (0 .. ($repeat - 1)) {
     for my $msg (@messages) {
 
@@ -402,6 +424,7 @@ for (0 .. ($repeat - 1)) {
         sleep($sleep) if $sleep;
     }
 }
+
 my $duration = time() - $start;
 print sprintf("\nRun time: %0.3f\n", $duration) unless $silent;
 

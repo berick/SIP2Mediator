@@ -192,6 +192,8 @@ $FFSpec::date_time_sync      = $STSFF->new(18, $l->get('date/time sync'));
 $FFSpec::third_party_allowed = $STSFF->new(1,  $l->get('third party allowed'));
 $FFSpec::renewed_count       = $STSFF->new(4,  $l->get('renewed count'));
 $FFSpec::unrenewed_count     = $STSFF->new(4,  $l->get('unrenewed count'));
+$FFSpec::hold_mode           = $STSFF->new(1,  $l->get('hold mode'));
+$FFSpec::hold_avail          = $STSFF->new(1,  $l->get('hold available'));
 
 # --- Variable-Length Field Definitions -------------------------------------
 
@@ -444,6 +446,22 @@ $MSpec::checkin_resp = $STSM->new(
         $FFSpec::date
     ]
 );
+
+$MSpec::hold = $STSM->new(
+    '15', $l->get('Hold Request'), [
+        $FFSpec::hold_mode,
+        $FFSpec::date,
+    ]
+);
+
+$MSpec::hold = $STSM->new(
+    '16', $l->get('Hold Response'), [
+        $FFSpec::ok,
+        $FFSpec::hold_avail,
+        $FFSpec::date,
+    ]
+);
+
  
 $MSpec::fee_paid = $STSM->new(
     '37', $l->get('Fee Paid'), [
