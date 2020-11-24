@@ -21,7 +21,7 @@ use SIP2Mediator::Server;
 
 my $sip_address     = '127.0.0.1';
 my $sip_port        = 6001;
-my $http_host       = '10.0.0.58';
+my $http_host       = '127.0.0.1';
 my $http_port       = 80;
 my $http_proto      = 'http';
 my $http_path       = '/sip2-mediator';
@@ -68,7 +68,7 @@ Options:
     --syslog-facility <$syslog_facility>
 
     --ascii
-        Normalized and encode data returned to SIP clients as ASCII.
+        Normalize and encode data returned to SIP clients as ASCII.
         Otherwise, uses UTF8.
 
     --daemonize
