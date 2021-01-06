@@ -189,6 +189,11 @@ $FFSpec::offline_ok          = $STSFF->new(1,  $l->get('offline ok'));
 $FFSpec::timeout_period      = $STSFF->new(3,  $l->get('timeout period'));
 $FFSpec::retries_allowed     = $STSFF->new(3,  $l->get('retries allowed'));
 $FFSpec::date_time_sync      = $STSFF->new(18, $l->get('date/time sync'));
+$FFSpec::third_party_allowed = $STSFF->new(1,  $l->get('third party allowed'));
+$FFSpec::renewed_count       = $STSFF->new(4,  $l->get('renewed count'));
+$FFSpec::unrenewed_count     = $STSFF->new(4,  $l->get('unrenewed count'));
+$FFSpec::hold_mode           = $STSFF->new(1,  $l->get('hold mode'));
+$FFSpec::hold_avail          = $STSFF->new(1,  $l->get('hold available'));
 
 # --- Variable-Length Field Definitions -------------------------------------
 
@@ -379,12 +384,47 @@ $MSpec::checkout = $STSM->new(
     ]
 );
 
+
 $MSpec::checkout_resp = $STSM->new(
     '12', $l->get('Checkout Response'), [
         $FFSpec::ok,
         $FFSpec::renewal_ok,
         $FFSpec::magnetic_media,
         $FFSpec::desensitize,
+        $FFSpec::date
+    ]
+);
+
+$MSpec::renew = $STSM->new(
+    '29', $l->get('Renew Request'), [
+        $FFSpec::third_party_allowed,
+        $FFSpec::no_block,
+        $FFSpec::date,
+        $FFSpec::nb_due_date
+    ]
+);
+
+$MSpec::renew_resp = $STSM->new(
+    '30', $l->get('Renew Response'), [
+        $FFSpec::ok,
+        $FFSpec::renewal_ok,
+        $FFSpec::magnetic_media,
+        $FFSpec::desensitize,
+        $FFSpec::date
+    ]
+);
+
+$MSpec::renew_all = $STSM->new(
+    '65', $l->get('Renew All Request'), [
+        $FFSpec::date
+    ]
+);
+
+$MSpec::renew_all_resp = $STSM->new(
+    '66', $l->get('Renew All Response'), [
+        $FFSpec::ok,
+        $FFSpec::renewed_count,
+        $FFSpec::unrenewed_count,
         $FFSpec::date
     ]
 );
@@ -406,6 +446,22 @@ $MSpec::checkin_resp = $STSM->new(
         $FFSpec::date
     ]
 );
+
+$MSpec::hold = $STSM->new(
+    '15', $l->get('Hold Request'), [
+        $FFSpec::hold_mode,
+        $FFSpec::date,
+    ]
+);
+
+$MSpec::hold = $STSM->new(
+    '16', $l->get('Hold Response'), [
+        $FFSpec::ok,
+        $FFSpec::hold_avail,
+        $FFSpec::date,
+    ]
+);
+
  
 $MSpec::fee_paid = $STSM->new(
     '37', $l->get('Fee Paid'), [

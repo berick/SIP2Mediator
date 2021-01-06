@@ -17,6 +17,7 @@ use strict; use warnings;
 use Locale::gettext;
 use JSON::XS;
 use JSON::Path qw/jpath1/;
+use Sys::Syslog qw(syslog);
 use SIP2Mediator::Spec;
 use SIP2Mediator::Field;
 use SIP2Mediator::FixedField;
@@ -96,13 +97,24 @@ sub from_sip {
     my ($class, $txt) = @_;
 
     my $msg = SIP2Mediator::Message->new;
-    $msg->{spec} = SIP2Mediator::Spec::Message->find_by_code(substr($txt, 0, 2));
+    my $code = substr($txt, 0, 2);
+    $msg->{spec} = SIP2Mediator::Spec::Message->find_by_code($code);
 
-    return undef unless $msg->{spec};
+    if (!$msg->{spec}) {
+        syslog('LOG_WARNING', "Unknown message type: '$code'");
+        return undef;
+    }
 
     $txt = substr($txt, 2);
 
     for my $ffspec (@{$msg->spec->fixed_fields}) {
+
+        unless (defined $txt && length($txt) >= $ffspec->length) {
+            syslog('LOG_WARNING', 
+                "Fixed fields do not match spec for code $code.  Discarding");
+            return undef;
+        }
+
         my $value = substr($txt, 0, $ffspec->length);
         $txt = substr($txt, $ffspec->length);
         push(@{$msg->fixed_fields}, 
@@ -157,14 +169,19 @@ sub from_json {
 sub from_hash {
     my ($class, $hash) = @_;
 
+    return undef unless $hash && $hash->{code};
+    my @fixed_fields = @{$hash->{fixed_fields} || []};
+
+    syslog('LOG_WARNING', "Fixed fields contain undefined values: @fixed_fields")
+        if grep {!defined $_} @fixed_fields;
+
     # Start with a SIP message string which contains only the 
     # message code and fixed fields.
-    my $txt = sprintf('%s%s',
-        $hash->{code},
-        join('', @{$hash->{fixed_fields} || []})
-    );
+    my $txt = sprintf('%s%s', $hash->{code}, join('', @fixed_fields));
 
     my $msg = $class->from_sip($txt);
+
+    return undef unless $msg;
 
     # Then add the variable length Fields
     

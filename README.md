@@ -116,6 +116,6 @@ srfsh# request open-ils.sip2 open-ils.sip2.request "randomkey", {"code":"93","fi
 
 ### Current Evergreen Working Branch
 
-https://github.com/berick/Evergreen/tree/sip2-mediator
+https://bugs.launchpad.net/evergreen/+bug/1901930
 
 

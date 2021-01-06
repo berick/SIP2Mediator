@@ -44,6 +44,11 @@ my $patron_barcode;
 my $patron_password;
 my $patron_summary = ' 'x10;
 my $with_cancel;
+my $fee_identifier;
+my $fee_amount;
+my $fee_type = '01'; # unknown
+my $payment_type = '00'; # cash
+my $currency_type = 'USD'; 
 
 sub usage {
     my $exit = shift || 0;
@@ -88,6 +93,22 @@ Options:
         request.  Useful for requesting additional data in the response.
         E.g. to request hold items: --patron-summary "Y         "
 
+    --fee-identifier <value>
+        fee-payment message will apply the payment to this specific
+        ILS transaction/fee identifier value.
+
+    --fee-amount <amount>
+        Amount to pay toward the specified transaction(s).
+
+    --fee-type <2-char-code>
+        SIP fee type specifier.  Defaults to '01' (unknown)
+
+    --payment-type <2-char-code>
+        SIP payment type specifier.  Defaults to '00' (cash)
+
+    --currency-type <3-char-currency>
+        SIP currency type.  Defaults to $currency_type;
+
     --with-cancel
         Send the SIP 'BI' ("cancel") field during checkin or checkout.
         
@@ -98,6 +119,9 @@ Options:
         'patron-information'
         'patron-status'
         'checkin'
+        'checkout'
+        'renew'
+        'fee-payment'
 
     --repeat <count>
         Repeat each --message this many times.  Useful for load testing.
@@ -125,6 +149,8 @@ sub send_recv {
 
     my $msg = SIP2Mediator::Message->from_hash($msg_hash);
     $| = 1;
+
+    die "Error creating SIP message\n" unless $msg;
 
     if (!$silent) {
         if ($summarize) {
@@ -179,6 +205,67 @@ sub item_information {
     });
 }
 
+sub checkout {
+
+    die "--patron-barcode and --item-barcode required for checkout\n" 
+        unless $patron_barcode && $item_barcode;
+
+    send_recv({
+        code => '11',
+        fixed_fields => [
+            'N', # renewal policy
+            'N', # no-block
+            SIP2Mediator::Spec->sip_date,
+            SIP2Mediator::Spec->sip_date
+        ],
+        fields => [
+            {AO => $institution}, 
+            {AA => $patron_barcode},
+            {AB => $item_barcode},
+            $patron_password ? {AD => $patron_password} : ()
+        ]
+    });
+}
+
+sub renew {
+
+    die "--patron-barcode and --item-barcode required for renew\n" 
+        unless $patron_barcode && $item_barcode;
+
+    send_recv({
+        code => '29',
+        fixed_fields => [
+            'Y', # third party allowed
+            'N', # no-block
+            SIP2Mediator::Spec->sip_date, # trans date
+            SIP2Mediator::Spec->sip_date  # non-block due date
+        ],
+        fields => [
+            {AO => $institution}, 
+            {AA => $patron_barcode},
+            {AB => $item_barcode},
+            $patron_password ? {AD => $patron_password} : ()
+        ]
+    });
+}
+
+sub renew_all {
+
+    die "--patron-barcode required for renew all\n" unless $patron_barcode;
+
+    send_recv({
+        code => '65',
+        fixed_fields => [
+            SIP2Mediator::Spec->sip_date # trans date
+        ],
+        fields => [
+            {AO => $institution}, 
+            {AA => $patron_barcode},
+            $patron_password ? {AD => $patron_password} : ()
+        ]
+    });
+}
+
 sub checkin {
     die "--item-barcode required for checkin\n" unless $item_barcode;
 
@@ -228,6 +315,48 @@ sub patron_information {
     });
 }
 
+sub cancel_hold {
+
+    die "--patron-barcode and --item-barcode required for renew\n" 
+        unless $patron_barcode && $item_barcode;
+
+    send_recv({
+        code => '15',
+        fixed_fields => [
+            '-', # cancel
+            SIP2Mediator::Spec->sip_date
+        ],
+        fields => [
+            {AO => $institution}, 
+            {AA => $patron_barcode},
+            {AB => $item_barcode},
+            $patron_password ? {AD => $patron_password} : ()
+        ]
+    });
+}
+
+sub fee_payment {
+
+    die "fee-payment requires --patron-barcode and --fee-amount"
+        unless $patron_barcode && $fee_amount;
+
+    send_recv({
+        code => '37',
+        fixed_fields => [
+            SIP2Mediator::Spec->sip_date,
+            $fee_type,
+            $payment_type,
+            $currency_type
+        ],
+        fields => [
+            {AO => $institution}, 
+            {AA => $patron_barcode},
+            {BV => $fee_amount},
+            {CG => $fee_identifier}
+        ]
+    });
+}
+
 GetOptions(
     'pretty-print'      => \$pretty_print,
     'sip-address=s'     => \$sip_address,
@@ -241,6 +370,11 @@ GetOptions(
     'patron-password=s' => \$patron_password,
     'patron-summary=s'  => \$patron_summary,
     'with-cancel'       => \$with_cancel,
+    'fee-identifier=s'  => \$fee_identifier,
+    'fee-amount=s'      => \$fee_amount,
+    'fee-type=s'        => \$fee_type,
+    'payment-type=s'    => \$payment_type,
+    'currency-type=s'   => \$currency_type,
     'message=s'         => \@messages,
     'repeat=s'          => \$repeat,
     'sleep=s'           => \$sleep,
@@ -266,17 +400,31 @@ die "Client unable to connect\n" unless $client->connect;
 
 login();
 
+my $action_map = {
+    'sc-status'          => \&sc_status,
+    'item-information'   => \&item_information,
+    'patron-information' => \&patron_information,
+    'patron-status'      => \&patron_status,
+    'checkout'           => \&checkout,
+    'renew'              => \&renew,
+    'renew-all'          => \&renew_all,
+    'checkin'            => \&checkin,
+    'cancel-hold'        => \&cancel_hold,
+    'fee-payment'        => \&fee_payment
+};
+
 my $start = time();
-for my $msg (@messages) {
-    for (0 .. ($repeat - 1)) {
-        sc_status() if $msg eq 'sc-status';
-        item_information() if $msg eq 'item-information';
-        patron_information() if $msg eq 'patron-information';
-        patron_status() if $msg eq 'patron-status';
-        checkin() if $msg eq 'checkin';
+
+for (0 .. ($repeat - 1)) {
+    for my $msg (@messages) {
+
+        die "Action '$msg' not supported.\n" unless $action_map->{$msg};
+
+        $action_map->{$msg}->();
         sleep($sleep) if $sleep;
     }
 }
+
 my $duration = time() - $start;
 print sprintf("\nRun time: %0.3f\n", $duration) unless $silent;
 

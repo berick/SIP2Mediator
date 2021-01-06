@@ -279,6 +279,12 @@ sub read_http_socket {
 
     my $msg = SIP2Mediator::Message->from_json($content, $self->config->{response_jpath});
 
+    if (!$msg) {
+        syslog('LOG_ERR', "SIP HTTP backend returned unusable data: $content");
+        # treat this as a non-fatal condition.
+        return 1;
+    }
+
     return $self->relay_sip_response($msg);
 }
 
