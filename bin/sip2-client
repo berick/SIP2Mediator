@@ -177,14 +177,19 @@ sub send_recv {
                 $duration, $pretty_print ? $resp->to_str : $resp->to_sip);
         }
     }
+
+    return $resp;
 }
 
 sub login {
-    send_recv({
+    my $resp = send_recv({
         code => 93,
         fixed_fields => ['0', '0'],
         fields => [{CN => $sip_username}, {CO => $sip_password}]
     });
+
+    warn "\n*SIP login failed*\n\n" unless
+        ref $resp->{fixed_fields} && $resp->{fixed_fields}->[0]->value eq '1';
 }
 
 sub sc_status {
