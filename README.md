@@ -6,7 +6,7 @@
 
 ```sh
 sudo apt install build-essential libjson-xs-perl libnet-https-nb-perl libdatetime-perl
-sudo cpan URL::Encode::XS
+sudo cpan URL::Encode::XS JSON::Path
 ```
 
 ### Usage
@@ -25,6 +25,16 @@ PERL5LIB=lib bin/sip2-mediator  \
     --max-clients 120           \
     --syslog-facility LOCAL4
 ```
+
+#### Running the SIP2Mediator Using Evergreen Gateway
+
+PERL5LIB=lib bin/sip2-mediator              \
+     --syslog-facility LOCAL4               \
+     --session-param param                  \
+     --message-param param                  \
+     --http-method GET                      \
+     --response-json-path "\$.payload[0]"   \
+     --http-path "/gateway?service=open-ils.sip2&method=open-ils.sip2.request"
 
 #### Graceful Shutdown
 

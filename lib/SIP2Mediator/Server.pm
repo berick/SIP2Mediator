@@ -24,6 +24,11 @@ use Sys::Syslog qw(syslog);
 use URL::Encode::XS qw/url_encode_utf8/;
 use Encode;
 use Unicode::Normalize;
+use JSON::XS;
+
+my $json = JSON::XS->new;
+$json->ascii(1);
+$json->allow_nonref(1);
 
 my %sip_socket_map;
 my %http_socket_map;
@@ -211,6 +216,9 @@ sub relay_sip_request {
     my $sess_param = $self->config->{session_param} || 'session';
     my $mess_param = $self->config->{message_param} || 'message';
     my $http_method = $self->config->{http_method} || 'POST';
+    my $sess_json = $self->config->{json_session};
+
+    my $seskey = $sess_json ? $json->encode($self->seskey) : $self->seskey;
 
     my $post = sprintf('%s=%s&%s=%s',
         $sess_param, $self->seskey, $mess_param, url_encode_utf8($msg->to_json));
