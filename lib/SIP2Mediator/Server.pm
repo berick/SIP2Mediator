@@ -46,7 +46,8 @@ sub new {
     my $count = scalar(keys(%sip_socket_map));
 
     my $sclient = $self->sip_socket_str;
-    syslog(LOG_DEBUG => "[$sclient] New SIP client connecting; total=$count");
+    syslog(LOG_DEBUG => "[$sclient] New SIP client connecting; ".
+        "total=$count; key=".substr($self->seskey, 0, 10));
 
     return $self;
 }
@@ -116,8 +117,11 @@ sub from_http_socket {
 sub cleanup {
     my $self = shift;
 
-    delete $sip_socket_map{$self->sip_socket};
-    delete $http_socket_map{$self->http_socket};
+    # If we send an end-session message and our HTTP socket has timed
+    # out, then this session will no longer be around to see the error
+    # and resend the request. Force-create a new HTTP socket when
+    # sending the final disconnect to ensure it's delivered.
+    $self->create_http_socket;
 
     if ($self->http_socket) {
         # Let the HTTP backend know we are shutting down so it can
@@ -134,6 +138,9 @@ sub cleanup {
     $self->http_socket->shutdown(2);
     $self->sip_socket->close;
     $self->http_socket->close;
+
+    delete $sip_socket_map{$self->sip_socket};
+    delete $http_socket_map{$self->http_socket};
     delete $self->{http_socket};
     delete $self->{sip_socket};
 }
@@ -185,7 +192,8 @@ sub read_sip_socket {
     my $sip_txt = decode_utf8(readline($self->sip_socket));
 
     unless ($sip_txt) {
-        syslog(LOG_DEBUG => "[$sclient] SIP client disconnected");
+        syslog(LOG_DEBUG => "[$sclient] SIP client disconnected; ".
+            "key=".substr($self->seskey, 0, 10));
         return 0;
     }
 
