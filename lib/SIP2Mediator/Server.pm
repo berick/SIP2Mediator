@@ -43,8 +43,10 @@ sub new {
     $sip_socket_map{$self->sip_socket} = $self;
     $self->create_http_socket;
 
+    my $count = scalar(keys(%sip_socket_map));
+
     my $sclient = $self->sip_socket_str;
-    syslog(LOG_DEBUG => "[$sclient] New SIP client connecting");
+    syslog(LOG_DEBUG => "[$sclient] New SIP client connecting; total=$count");
 
     return $self;
 }

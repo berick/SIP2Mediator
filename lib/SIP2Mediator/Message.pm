@@ -71,7 +71,11 @@ sub to_sip {
 
     $txt .= $_->to_sip for @{$self->fixed_fields};
 
-    $txt .= $_->to_sip for @{$self->fields};
+    $txt .= $_->to_sip for 
+        # Sort by spec code for consistent message format.
+        sort {$a->spec->code cmp $b->spec->code}
+        # Skip any fields that have no value.
+        grep {defined $_->value} @{$self->fields};
 
     $txt .= SIP2Mediator::Spec::LINE_TERMINATOR;
 
