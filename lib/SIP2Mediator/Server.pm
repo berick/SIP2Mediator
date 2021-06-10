@@ -38,6 +38,9 @@ sub new {
         prev_sip_message => undef
     };
 
+    $self->{sip_socket_str} = sprintf('%s:%s', 
+        $sip_socket->peerhost, $sip_socket->peerport);
+
     $self = bless($self, $class);
 
     $sip_socket_map{$self->sip_socket} = $self;
@@ -114,35 +117,46 @@ sub from_http_socket {
     return $http_socket_map{$socket};
 }
 
-sub cleanup {
+sub cleanup_sip_socket {
     my $self = shift;
+    my $skip_xs = shift;
+    my $sclient = $self->sip_socket_str;
 
-    # If we send an end-session message and our HTTP socket has timed
-    # out, then this session will no longer be around to see the error
-    # and resend the request. Force-create a new HTTP socket when
-    # sending the final disconnect to ensure it's delivered.
-    $self->create_http_socket;
+    syslog(LOG_DEBUG => "[$sclient] cleaning up sip socket ".$self->seskey);
 
-    if ($self->http_socket) {
+    $self->sip_socket->shutdown(2);
+    $self->sip_socket->close;
+    delete $sip_socket_map{$self->sip_socket};
+    delete $self->{sip_socket};
+
+    if (!$skip_xs && $self->http_socket) {
+        syslog(LOG_DEBUG => "[$sclient] sending XS for ".$self->seskey);
+
         # Let the HTTP backend know we are shutting down so it can
         # clean up any session data.
-        my $sclient = $self->sip_socket_str;
-        syslog(LOG_DEBUG => 
-            "[$sclient] Sending End Session message to HTTP backend");
-
         $self->relay_sip_request(
             SIP2Mediator::Message->from_hash({code => 'XS'}));
     }
+}
 
-    $self->sip_socket->shutdown(2);
+sub cleanup_http_socket {
+    my $self = shift;
+    my $sclient = $self->sip_socket_str;
+
+    syslog(LOG_DEBUG => "[$sclient] cleaning up http socket ".$self->seskey);
+
     $self->http_socket->shutdown(2);
-    $self->sip_socket->close;
     $self->http_socket->close;
 
-    delete $sip_socket_map{$self->sip_socket};
     delete $http_socket_map{$self->http_socket};
     delete $self->{http_socket};
-    delete $self->{sip_socket};
+
+    if ($self->sip_socket) {
+        # Normally the SIP socket is shut down first, initiated by the
+        # SIP client.  However, if there's an HTTP hiccup, HTTP may be
+        # shut down first, so go ahead and cleanup the SIP socket.
+        $self->cleanup_sip_socket(1);
+    }
 }
 
 sub seskey {
@@ -162,8 +176,7 @@ sub http_socket {
 
 sub sip_socket_str {
     my ($self) = @_;
-    my $s = $self->sip_socket;
-    return sprintf('%s:%s', $s->peerhost, $s->peerport);
+    return $self->{sip_socket_str};
 }
 
 sub dead {
@@ -285,6 +298,9 @@ sub read_http_socket {
         return 1;
     }
 
+    # avoid relaying, initiate cleanup
+    return 0 if $msg->spec->code eq 'XT'; # end session response
+
     return $self->relay_sip_response($msg);
 }
 
@@ -352,7 +368,13 @@ sub cleanup {
 
     for my $sock (keys %sip_socket_map) {
         my $ses = SIP2Mediator::Server::Session->from_sip_socket($sock);
-        $ses->cleanup if $ses;
+        if ($ses) {
+            $ses->cleanup_sip_socket;
+            # Give the end message a chance to be delivered before 
+            # we cut it's socket off.
+            sleep 1;
+            $ses->cleanup_http_socket;
+        }
     }
 
     exit(0);
@@ -413,6 +435,11 @@ sub listen {
         # Block until we have work to do.
         my @ready = $select->can_read;
 
+        if (!@ready) {
+            syslog(LOG_ERR => "Select failed: $!.  Closing server to prevent looping");
+            exit(1);
+        }
+
         for my $socket (@ready) {
             my $session;
 
@@ -446,9 +473,11 @@ sub listen {
 
                 if ($session->dead || !$session->read_sip_socket) {
                     $select->remove($session->sip_socket);
-                    $select->remove($session->http_socket);
-                    # SIP client disconnected
-                    $session->cleanup;
+
+                    # This will send the 'XS' end-session message
+                    # Leave the HTTP socket open until we get the response
+                    # from the server.
+                    $session->cleanup_sip_socket;
 
                 } else {
                     $in_flight++;
@@ -458,9 +487,8 @@ sub listen {
                 SIP2Mediator::Server::Session->from_http_socket($socket)) {
 
                 if ($session->dead || !$session->read_http_socket) {
-                    $select->remove($session->sip_socket);
                     $select->remove($session->http_socket);
-                    $session->cleanup;
+                    $session->cleanup_http_socket;
 
                 } else {
                     $in_flight--;

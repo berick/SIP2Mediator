@@ -484,6 +484,7 @@ $MSpec::fee_paid_resp = $STSM->new(
 # about a patron but about a SIP client session, which can involve
 # many patrons (or none).  There is no corresponding response message.
 $MSpec::end_session = $STSM->new('XS', $l->get('End Session'), []);
+$MSpec::end_session_resp = $STSM->new('XT', $l->get('End Session Response'), []);
 
 
 1;
