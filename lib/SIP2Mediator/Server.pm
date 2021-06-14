@@ -124,10 +124,17 @@ sub cleanup_sip_socket {
 
     syslog(LOG_DEBUG => "[$sclient] cleaning up sip socket ".$self->seskey);
 
-    $self->sip_socket->shutdown(2);
-    $self->sip_socket->close;
-    delete $sip_socket_map{$self->sip_socket};
-    delete $self->{sip_socket};
+    if ($self->sip_socket) {
+
+        $self->sip_socket->shutdown(2);
+        $self->sip_socket->close;
+        delete $sip_socket_map{$self->sip_socket};
+        delete $self->{sip_socket};
+
+    } else {
+        # Should never get here, but avoid crashing the server in case.
+        syslog(LOG_DEBUG => "[$sclient] SIP socket disapeared ".$self->seskey);
+    }
 
     if (!$skip_xs && $self->http_socket) {
         syslog(LOG_DEBUG => "[$sclient] sending XS for ".$self->seskey);
@@ -147,11 +154,17 @@ sub cleanup_http_socket {
 
     syslog(LOG_DEBUG => "[$sclient] cleaning up http socket ".$self->seskey);
 
-    $self->http_socket->shutdown(2);
-    $self->http_socket->close;
+    if ($self->http_socket) {
 
-    delete $http_socket_map{$self->http_socket};
-    delete $self->{http_socket};
+        $self->http_socket->shutdown(2);
+        $self->http_socket->close;
+        delete $http_socket_map{$self->http_socket};
+        delete $self->{http_socket};
+
+    } else {
+        # Should never get here, but avoid crashing the server just in case.
+        syslog(LOG_DEBUG => "[$sclient] HTTP socket disappeared ".$self->seskey);
+    }
 
     if ($self->sip_socket) {
         # Normally the SIP socket is shut down first, initiated by the
@@ -233,6 +246,13 @@ sub read_sip_socket {
 
 sub relay_sip_request {
     my ($self, $msg) = @_;
+    my $sclient = $self->sip_socket_str;
+
+    if (!$self->http_socket) {
+        # Should never get here, but avoid crashing the server in case.
+        syslog(LOG_DEBUG => "[$sclient] SIP socket disapeared ".$self->seskey);
+        return 0;
+    }
 
     my $post = sprintf('session=%s&message=%s',
         $self->seskey, url_encode_utf8($msg->to_json));
@@ -310,6 +330,12 @@ sub read_http_socket {
 sub relay_sip_response {
     my ($self, $msg) = @_;
     my $sclient = $self->sip_socket_str;
+
+    if (!$self->sip_socket) {
+        # Should never get here, but avoid crashing the server in case.
+        syslog(LOG_DEBUG => "[$sclient] SIP socket disapeared ".$self->seskey);
+        return 0;
+    }
 
     my $sip_txt = $msg->to_sip;
 
