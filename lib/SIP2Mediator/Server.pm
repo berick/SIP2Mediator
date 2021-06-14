@@ -132,10 +132,12 @@ sub cleanup_sip_socket {
     if (!$skip_xs && $self->http_socket) {
         syslog(LOG_DEBUG => "[$sclient] sending XS for ".$self->seskey);
 
+        my $msg = SIP2Mediator::Message->from_hash({code => 'XS'});
+        $self->prev_sip_message($msg);
+
         # Let the HTTP backend know we are shutting down so it can
         # clean up any session data.
-        $self->relay_sip_request(
-            SIP2Mediator::Message->from_hash({code => 'XS'}));
+        $self->relay_sip_request($msg);
     }
 }
 
@@ -293,7 +295,8 @@ sub read_http_socket {
     my $msg = SIP2Mediator::Message->from_json($content);
 
     if (!$msg) {
-        syslog('LOG_ERR', "SIP HTTP backend returned unusable data: $content");
+        syslog('LOG_ERR', 
+            "[$sclient] SIP HTTP backend returned unusable data: $content");
         # treat this as a non-fatal condition.
         return 1;
     }
