@@ -49,7 +49,7 @@ sub new {
     my $count = scalar(keys(%sip_socket_map));
 
     my $sclient = $self->sip_socket_str;
-    syslog(LOG_DEBUG => "[$sclient] New SIP client connecting; ".
+    syslog(LOG_INFO => "[$sclient] New SIP client connecting; ".
         "total=$count; key=".substr($self->seskey, 0, 10));
 
     return $self;
@@ -133,7 +133,7 @@ sub cleanup_sip_socket {
 
     } else {
         # Should never get here, but avoid crashing the server in case.
-        syslog(LOG_DEBUG => "[$sclient] SIP socket disapeared ".$self->seskey);
+        syslog(LOG_WARNING => "[$sclient] SIP socket disapeared ".$self->seskey);
     }
 
     if (!$skip_xs && $self->http_socket) {
@@ -163,7 +163,7 @@ sub cleanup_http_socket {
 
     } else {
         # Should never get here, but avoid crashing the server just in case.
-        syslog(LOG_DEBUG => "[$sclient] HTTP socket disappeared ".$self->seskey);
+        syslog(LOG_WARNING => "[$sclient] HTTP socket disappeared ".$self->seskey);
     }
 
     if ($self->sip_socket) {
@@ -227,7 +227,7 @@ sub read_sip_socket {
 
     $sip_txt = SIP2Mediator::Message->clean_sip_packet($sip_txt);
 
-    syslog(LOG_DEBUG => "[$sclient] INPUT $sip_txt");
+    syslog(LOG_INFO => "[$sclient] INPUT $sip_txt");
 
     # Client sent an empty request.  Ignore it.
     return 1 unless $sip_txt;
@@ -235,7 +235,7 @@ sub read_sip_socket {
     my $msg = SIP2Mediator::Message->from_sip($sip_txt);
 
     if (!$msg) {
-        syslog(LOG_DEBUG => "[$sclient] sent invalid SIP: $sip_txt");
+        syslog(LOG_WARNING => "[$sclient] sent invalid SIP: $sip_txt");
         return 0;
     }
 
@@ -250,14 +250,14 @@ sub relay_sip_request {
 
     if (!$self->http_socket) {
         # Should never get here, but avoid crashing the server in case.
-        syslog(LOG_DEBUG => "[$sclient] SIP socket disapeared ".$self->seskey);
+        syslog(LOG_WARNING => "[$sclient] SIP socket disapeared ".$self->seskey);
         return 0;
     }
 
     my $post = sprintf('session=%s&message=%s',
         $self->seskey, url_encode_utf8($msg->to_json));
 
-    #syslog(LOG_INFO => "POST: $post");
+    syslog(LOG_DEBUG => "POST: $post");
 
     $self->http_socket->write_request(POST => $self->config->{http_path}, $post);
 
@@ -305,12 +305,10 @@ sub read_http_socket {
 
         last if $n == 0; # done reading
 
-        #syslog(LOG_DEBUG => "[$sclient] HTTP read returned $n bytes");
-
         $content .= $buf;
     }
 
-    #syslog(LOG_DEBUG => "[$sclient] HTTP response: $content");
+    syslog(LOG_DEBUG => "[$sclient] HTTP response: $content");
 
     my $msg = SIP2Mediator::Message->from_json($content);
 
@@ -333,13 +331,13 @@ sub relay_sip_response {
 
     if (!$self->sip_socket) {
         # Should never get here, but avoid crashing the server in case.
-        syslog(LOG_DEBUG => "[$sclient] SIP socket disapeared ".$self->seskey);
+        syslog(LOG_WARNING => "[$sclient] SIP socket disapeared ".$self->seskey);
         return 0;
     }
 
     my $sip_txt = $msg->to_sip;
 
-    syslog(LOG_DEBUG => "[$sclient] OUTPUT $sip_txt");
+    syslog(LOG_INFO => "[$sclient] OUTPUT $sip_txt");
 
     local $SIG{'PIPE'} = sub {                                                 
         syslog(LOG_DEBUG => "SIP client [$sclient] disconnected prematurely");
@@ -366,7 +364,8 @@ sub relay_sip_response {
 # -----------------------------------------------------------------------
 package SIP2Mediator::Server;
 use strict; use warnings;
-use Sys::Syslog qw(syslog openlog);
+use Sys::Syslog 
+    qw(syslog openlog setlogmask LOG_UPTO LOG_DEBUG LOG_INFO LOG_WARNING LOG_ERR);
 use Net::HTTP::NB;
 use Net::HTTPS::NB;
 use Socket;
@@ -414,10 +413,23 @@ sub client_count {
     return scalar(keys(%sip_socket_map));
 }
 
+sub loglevel {
+    my $self = shift;
+
+    # Surely there's a simpler way to do this?
+    my $l = $self->config->{syslog_level};
+
+    return LOG_DEBUG if $l eq 'LOG_DEBUG';
+    return LOG_WARNING if $l eq 'LOG_WARNING';
+    return LOG_ERR if $l eq 'LOG_ERR';
+    return LOG_INFO;
+}
+
 sub listen {
     my $self = shift;
 
     openlog('SIP2Mediator', 'pid', $self->config->{syslog_facility});
+    setlogmask(LOG_UPTO($self->loglevel));
 
     my $server_socket = IO::Socket::INET->new(
         Proto => 'tcp',
