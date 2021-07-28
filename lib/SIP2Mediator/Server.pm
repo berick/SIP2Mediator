@@ -14,19 +14,15 @@
 # -----------------------------------------------------------------------
 
 # -----------------------------------------------------------------------
-# Models a single SIP client connection and its paired HTTP back-end.
+# Models a single SIP client connection and its paired ILS back-end.
 # -----------------------------------------------------------------------
 package SIP2Mediator::Server::Session;
 use strict; use warnings;
 use Digest::MD5 qw/md5_hex/;
 use SIP2Mediator::Spec;
 use Sys::Syslog qw(syslog);
-use URL::Encode::XS qw/url_encode_utf8/;
-use Encode;
-use Unicode::Normalize;
 
 my %sip_socket_map;
-my %http_socket_map;
 
 sub new {
     my ($class, $config, $sip_socket) = @_;
@@ -34,8 +30,7 @@ sub new {
     my $self = {
         seskey => md5_hex(time."$$".rand()),
         sip_socket => $sip_socket,
-        config => $config,
-        prev_sip_message => undef
+        config => $config
     };
 
     $self->{sip_socket_str} = sprintf('%s:%s', 
@@ -44,22 +39,15 @@ sub new {
     $self = bless($self, $class);
 
     $sip_socket_map{$self->sip_socket} = $self;
-    $self->create_http_socket;
 
     my $count = scalar(keys(%sip_socket_map));
 
     my $sclient = $self->sip_socket_str;
+
     syslog(LOG_INFO => "[$sclient] New SIP client connecting; ".
         "total=$count; key=".substr($self->seskey, 0, 10));
 
     return $self;
-}
-
-sub prev_sip_message {
-    my $self = shift;
-    my $prev = shift;
-    $self->{prev_sip_message} = $prev if defined $prev;
-    return $self->{prev_sip_message};
 }
 
 sub config {
@@ -67,54 +55,9 @@ sub config {
     return $self->{config};
 }
 
-sub create_http_socket {
-    my $self = shift;
-    $self->http_dead(0);
-
-    if (my $sock = $self->http_socket) { # Clean up the old socket
-        my $sclient = $self->sip_socket_str;
-        syslog(LOG_DEBUG => "[$sclient] Closing exhausted HTTP socket");
-        delete $http_socket_map{$sock};    
-        delete $self->{http_socket};
-        $sock->shutdown(2);
-        $sock->close;
-    }
-
-    my %http_args = (
-        Host => $self->config->{http_host},
-        PeerPort => $self->config->{http_port},
-        KeepAlive => 1 # true
-    );
-
-    if ($self->config->{http_proto} eq 'http') {
-        $self->{http_socket} = Net::HTTP::NB->new(%http_args);
-    } else {
-        $self->{http_socket} = Net::HTTPS::NB->new(%http_args);
-    }
-
-    my $sclient = $self->sip_socket_str;
-    syslog(LOG_DEBUG => 
-        "[$sclient] SIP client using HTTP(S) with local port " . 
-        $self->http_socket->sockport);
-
-    $http_socket_map{$self->http_socket} = $self;
-
-    if ($self->prev_sip_message) {
-        syslog(LOG_DEBUG => 
-            "[$sclient] Re-sending SIP request after HTTP timeout");
-        $self->relay_sip_request($self->prev_sip_message);
-        $self->prev_sip_message(0);
-    }
-}
-
 sub from_sip_socket {
     my ($class, $socket) = @_;
     return $sip_socket_map{$socket};
-}
-
-sub from_http_socket {
-    my ($class, $socket) = @_;
-    return $http_socket_map{$socket};
 }
 
 sub cleanup_sip_socket {
@@ -135,43 +78,6 @@ sub cleanup_sip_socket {
         # Should never get here, but avoid crashing the server in case.
         syslog(LOG_WARNING => "[$sclient] SIP socket disapeared ".$self->seskey);
     }
-
-    if (!$skip_xs && $self->http_socket) {
-        syslog(LOG_DEBUG => "[$sclient] sending XS for ".$self->seskey);
-
-        my $msg = SIP2Mediator::Message->from_hash({code => 'XS'});
-        $self->prev_sip_message($msg);
-
-        # Let the HTTP backend know we are shutting down so it can
-        # clean up any session data.
-        $self->relay_sip_request($msg);
-    }
-}
-
-sub cleanup_http_socket {
-    my $self = shift;
-    my $sclient = $self->sip_socket_str;
-
-    syslog(LOG_DEBUG => "[$sclient] cleaning up http socket ".$self->seskey);
-
-    if ($self->http_socket) {
-
-        $self->http_socket->shutdown(2);
-        $self->http_socket->close;
-        delete $http_socket_map{$self->http_socket};
-        delete $self->{http_socket};
-
-    } else {
-        # Should never get here, but avoid crashing the server just in case.
-        syslog(LOG_WARNING => "[$sclient] HTTP socket disappeared ".$self->seskey);
-    }
-
-    if ($self->sip_socket) {
-        # Normally the SIP socket is shut down first, initiated by the
-        # SIP client.  However, if there's an HTTP hiccup, HTTP may be
-        # shut down first, so go ahead and cleanup the SIP socket.
-        $self->cleanup_sip_socket(1);
-    }
 }
 
 sub seskey {
@@ -182,11 +88,6 @@ sub seskey {
 sub sip_socket {
     my $self = shift;
     return $self->{sip_socket};
-}
-
-sub http_socket {
-    my $self = shift;
-    return $self->{http_socket};
 }
 
 sub sip_socket_str {
@@ -200,164 +101,6 @@ sub dead {
     return $self->{dead};
 }
 
-# True if the HTTP connection is no longer viable.
-sub http_dead {
-    my ($self, $value) = @_;
-    $self->{http_dead} = $value if defined $value;
-    return $self->{http_dead};
-}
-
-sub read_sip_socket {
-    my $self = shift;
-    my $sclient = $self->sip_socket_str;
-
-    local $SIG{'PIPE'} = sub {                                                 
-        syslog(LOG_DEBUG => "[$sclient] SIP client disconnected prematurely.");
-        $self->dead(1);
-    };    
-
-    local $/ = SIP2Mediator::Spec::LINE_TERMINATOR;
-    my $sip_txt = decode_utf8(readline($self->sip_socket));
-
-    unless ($sip_txt) {
-        syslog(LOG_DEBUG => "[$sclient] SIP client disconnected; ".
-            "key=".substr($self->seskey, 0, 10));
-        return 0;
-    }
-
-    $sip_txt = SIP2Mediator::Message->clean_sip_packet($sip_txt);
-
-    syslog(LOG_INFO => "[$sclient] INPUT $sip_txt");
-
-    # Client sent an empty request.  Ignore it.
-    return 1 unless $sip_txt;
-
-    my $msg = SIP2Mediator::Message->from_sip($sip_txt);
-
-    if (!$msg) {
-        syslog(LOG_WARNING => "[$sclient] sent invalid SIP: $sip_txt");
-        return 0;
-    }
-
-    $self->prev_sip_message($msg);
-
-    return $self->relay_sip_request($msg);
-}
-
-sub relay_sip_request {
-    my ($self, $msg) = @_;
-    my $sclient = $self->sip_socket_str;
-
-    if (!$self->http_socket) {
-        # Should never get here, but avoid crashing the server in case.
-        syslog(LOG_WARNING => "[$sclient] SIP socket disapeared ".$self->seskey);
-        return 0;
-    }
-
-    my $post = sprintf('session=%s&message=%s',
-        $self->seskey, url_encode_utf8($msg->to_json));
-
-    syslog(LOG_DEBUG => "POST: $post");
-
-    $self->http_socket->write_request(POST => $self->config->{http_path}, $post);
-
-    return 1;
-}
-
-sub read_http_socket {
-    my $self = shift;
-    my $sock = $self->http_socket;
-    my $sclient = $self->sip_socket_str;
-
-    my ($code, $mess, %headers);
-
-    # When the HTTP server closes the connection as a result of a
-    # KeepAlive timeout expiration, it will appear to IO::Select that
-    # data is ready for reading.  However, if read_response_headers is
-    # called and no data is there, Net::HTTP::NB will raise an error.
-    # Catch the error and mark the current HTTP socket as dead so a new
-    # one can be created. Note that $sock->connected still shows as
-    # true in such cases.
-    eval { ($code, $mess, %headers) = $sock->read_response_headers };
-
-    if ($@) {
-        $self->http_dead(1);
-        syslog(LOG_DEBUG => "[$sclient] HTTP server keepalive timed out.");
-        return 1; # not an error condition
-    }
-
-    if ($code ne '200') {
-        syslog(LOG_ERR => 
-            "[$sclient] HTTP replied with error code: $code => $mess");
-        return 0;
-    }
-
-    my ($content, $buf);
-
-    while (1) {
-
-        my $n = $sock->read_entity_body($buf, 1024);
-
-        unless (defined $n) {
-            syslog(LOG_ERR => "[$sclient] HTTP read error occured: $!");
-            return 0;
-        }
-
-        last if $n == 0; # done reading
-
-        $content .= $buf;
-    }
-
-    syslog(LOG_DEBUG => "[$sclient] HTTP response: $content");
-
-    my $msg = SIP2Mediator::Message->from_json($content);
-
-    if (!$msg) {
-        syslog('LOG_ERR', 
-            "[$sclient] SIP HTTP backend returned unusable data: $content");
-        # treat this as a non-fatal condition.
-        return 1;
-    }
-
-    # avoid relaying, initiate cleanup
-    return 0 if $msg->spec->code eq 'XT'; # end session response
-
-    return $self->relay_sip_response($msg);
-}
-
-sub relay_sip_response {
-    my ($self, $msg) = @_;
-    my $sclient = $self->sip_socket_str;
-
-    if (!$self->sip_socket) {
-        # Should never get here, but avoid crashing the server in case.
-        syslog(LOG_WARNING => "[$sclient] SIP socket disapeared ".$self->seskey);
-        return 0;
-    }
-
-    my $sip_txt = $msg->to_sip;
-
-    syslog(LOG_INFO => "[$sclient] OUTPUT $sip_txt");
-
-    local $SIG{'PIPE'} = sub {                                                 
-        syslog(LOG_DEBUG => "SIP client [$sclient] disconnected prematurely");
-        $self->dead(1);
-    };    
-
-    if ($self->config->{ascii}) {
-        # Normalize and strip combining characters.
-        $sip_txt = NFD($sip_txt);
-        $sip_txt =~ s/\pM+//og;
-        $sip_txt = encode('ascii', $sip_txt);
-    } else {
-        $sip_txt = encode_utf8($sip_txt);
-    }
-
-    $self->sip_socket->print($sip_txt);
-
-    return 1;
-}
-
 # -----------------------------------------------------------------------
 # Listens for new SIP client connections and routes requests and 
 # responses to the appropriate end points.
@@ -366,13 +109,16 @@ package SIP2Mediator::Server;
 use strict; use warnings;
 use Sys::Syslog 
     qw(syslog openlog setlogmask LOG_UPTO LOG_DEBUG LOG_INFO LOG_WARNING LOG_ERR);
-use Net::HTTP::NB;
-use Net::HTTPS::NB;
 use Socket;
 use IO::Select;
 use IO::Socket::INET;
 use SIP2Mediator::Spec;
 use SIP2Mediator::Message;
+use Encode;
+use Unicode::Normalize;
+
+# TODO MAKE THIS DYNAMIC
+use SIP2Mediator::Plugins::EvergreenILS;
 
 my $shutdown_requested = 0;
 $SIG{USR1} = sub { $shutdown_requested = 1; };
@@ -382,6 +128,11 @@ sub new {
 
     my $self = {config => $config};
 
+    # TODO MAKE THIS DYNAMIC
+    $self->{plugin} = SIP2Mediator::Plugins::EvergreenILS->new;
+
+    die "Cannot init SIP Plugin\n" unless $self->{plugin}->init($config);
+
     return bless($self, $class);
 }
 
@@ -390,20 +141,21 @@ sub config {
     return $self->{config};
 }
 
+sub plugin {
+    my $self = shift;
+    return $self->{plugin};
+}
+
 sub cleanup {
     my $self = shift;
     syslog(LOG_INFO => 'Cleaning up and exiting');
 
     for my $sock (keys %sip_socket_map) {
         my $ses = SIP2Mediator::Server::Session->from_sip_socket($sock);
-        if ($ses) {
-            $ses->cleanup_sip_socket;
-            # Give the end message a chance to be delivered before 
-            # we cut it's socket off.
-            sleep 1;
-            $ses->cleanup_http_socket;
-        }
+        $ses->cleanup_sip_socket if $ses;
     }
+
+    $self->plugin->shutdown;
 
     exit(0);
 }
@@ -443,6 +195,7 @@ sub listen {
 
     my $select = IO::Select->new;
     $select->add($server_socket);
+    $select->add($self->plugin->socket);
 
     syslog(LOG_INFO => 'Ready for clients...');
 
@@ -483,6 +236,7 @@ sub listen {
 
         for my $socket (@ready) {
             my $session;
+            my $plugin_resp;
 
             #syslog(LOG_DEBUG => "Socket active at peerport " . 
             #    $socket->peerport . " and local port " . $socket->sockport);
@@ -507,45 +261,121 @@ sub listen {
                     SIP2Mediator::Server::Session->new($self->config, $client);
 
                 $select->add($client);
-                $select->add($session->http_socket);
 
             } elsif ($session = # new SIP request
                 SIP2Mediator::Server::Session->from_sip_socket($socket)) {
 
-                if ($session->dead || !$session->read_sip_socket) {
+                if ($session->dead || !$self->relay_sip_request($session)) {
                     $select->remove($session->sip_socket);
 
                     # This will send the 'XS' end-session message
-                    # Leave the HTTP socket open until we get the response
-                    # from the server.
                     $session->cleanup_sip_socket;
 
                 } else {
                     $in_flight++;
                 }
 
-            } elsif ($session = # new HTTP response
-                SIP2Mediator::Server::Session->from_http_socket($socket)) {
+            } elsif ($plugin_resp = $self->plugin->recv) {
+                $in_flight--;
 
-                if ($session->dead || !$session->read_http_socket) {
-                    $select->remove($session->http_socket);
-                    $session->cleanup_http_socket;
+                $session = $plugin_resp->{session};
+                my $sip_hash = $plugin_resp->{sip_hash};
 
-                } else {
-                    $in_flight--;
-                }
-
-                if ($session->http_dead) {
-                    # Keepalive timed out.  Create a new connection and
-                    # add it to our select pool.
-                    $select->remove($session->http_socket);
-                    $session->create_http_socket;
-                    $select->add($session->http_socket);
+                if (!$self->relay_sip_response($session, $sip_hash)) {
+                    $select->remove($session->sip_socket);
+                    $session->cleanup_sip_socket;
                 }
             }
         }
     }
 }
+
+# Sends a SIP request from the SIP client to the ILS.
+sub relay_sip_request {
+    my $self = shift;
+    my $session = shift;
+    my $sclient = $session->sip_socket_str;
+
+    local $SIG{'PIPE'} = sub {                                                 
+        syslog(LOG_DEBUG => "[$sclient] SIP client disconnected prematurely.");
+        $session->dead(1);
+    };    
+
+    local $/ = SIP2Mediator::Spec::LINE_TERMINATOR;
+    my $sip_txt = decode_utf8(readline($session->sip_socket));
+
+    unless ($sip_txt) {
+        syslog(LOG_DEBUG => "[$sclient] SIP client disconnected; ".
+            "key=".substr($session->seskey, 0, 10));
+        return 0;
+    }
+
+    $sip_txt = SIP2Mediator::Message->clean_sip_packet($sip_txt);
+
+    syslog(LOG_INFO => "[$sclient] INPUT $sip_txt");
+
+    # Client sent an empty request.  Ignore it.
+    return 1 unless $sip_txt;
+
+    my $msg = SIP2Mediator::Message->from_sip($sip_txt);
+
+    if (!$msg) {
+        syslog(LOG_WARNING => "[$sclient] sent invalid SIP: $sip_txt");
+        return 0;
+    }
+
+    return $self->plugin->send($session, $msg->to_hash);
+}
+
+# Sends the SIP message response received from the ILS to the SIP client.
+sub relay_sip_response {
+    my ($self, $session, $sip_hash) = @_;
+    my $sclient = $session->sip_socket_str;
+
+    if (!$session->sip_socket) {
+        # Should never get here, but avoid crashing the server in case.
+        syslog(LOG_WARNING => "[$sclient] SIP socket disapeared ".$session->seskey);
+        return 0;
+    }
+
+    if (!$sip_hash) {
+        syslog('LOG_ERR', 
+            "[$sclient] SIP Plugin returned no data");
+        return 0;
+    }
+
+    my $sip_msg = SIP2Mediator::Message->from_hash($sip_hash);
+
+    if (!$sip_msg) {
+        syslog('LOG_ERR', 
+            "[$sclient] SIP Plugin returned unusable data"); # TODO log json
+        return 0;
+    }
+
+    my $sip_txt = $sip_msg->to_sip;
+
+    syslog(LOG_INFO => "[$sclient] OUTPUT $sip_txt");
+
+    local $SIG{'PIPE'} = sub {                                                 
+        syslog(LOG_DEBUG => "SIP client [$sclient] disconnected prematurely");
+        $session->dead(1);
+    };    
+
+    if ($self->config->{ascii}) {
+        # Normalize and strip combining characters.
+        $sip_txt = NFD($sip_txt);
+        $sip_txt =~ s/\pM+//og;
+        $sip_txt = encode('ascii', $sip_txt);
+    } else {
+        $sip_txt = encode_utf8($sip_txt);
+    }
+
+    $session->sip_socket->print($sip_txt);
+
+    return 1;
+}
+
+
 
 1;
 

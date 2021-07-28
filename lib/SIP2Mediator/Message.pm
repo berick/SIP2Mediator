@@ -141,20 +141,7 @@ sub from_sip {
 sub to_json {
     my $self = shift;
 
-    my @ffields;
-    my @fields;
-
-    push(@ffields, SIP2Mediator::Spec->sip_string($_->value)) 
-        for @{$self->fixed_fields};
-
-    push(@fields, {$_->spec->code => SIP2Mediator::Spec->sip_string($_->value)}) 
-        for @{$self->fields};
-
-    return $json->encode({
-        code => $self->spec->code,
-        fields => \@fields,
-        fixed_fields => \@ffields
-    });
+    return $json->encode($self->to_hash);
 }
 
 sub from_json {
@@ -165,6 +152,25 @@ sub from_json {
     my $hash = $json->decode($msg_json);
 
     return $class->from_hash($hash);
+}
+
+sub to_hash {
+    my $self = shift;
+
+    my @ffields;
+    my @fields;
+
+    push(@ffields, SIP2Mediator::Spec->sip_string($_->value)) 
+        for @{$self->fixed_fields};
+
+    push(@fields, {$_->spec->code => SIP2Mediator::Spec->sip_string($_->value)}) 
+        for @{$self->fields};
+
+    return {
+        code => $self->spec->code,
+        fields => \@fields,
+        fixed_fields => \@ffields
+    };
 }
 
 # Message from our JSON format as a hash/object.
