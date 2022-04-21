@@ -194,6 +194,7 @@ $FFSpec::renewed_count       = $STSFF->new(4,  $l->get('renewed count'));
 $FFSpec::unrenewed_count     = $STSFF->new(4,  $l->get('unrenewed count'));
 $FFSpec::hold_mode           = $STSFF->new(1,  $l->get('hold mode'));
 $FFSpec::hold_avail          = $STSFF->new(1,  $l->get('hold available'));
+$FFSpec::card_retained       = $STSFF->new(1,  $l->get('card retained'));
 
 # --- Variable-Length Field Definitions -------------------------------------
 
@@ -475,6 +476,13 @@ $MSpec::fee_paid = $STSM->new(
 $MSpec::fee_paid_resp = $STSM->new(
     '38', $l->get('Fee Paid Response'), [
         $FFSpec::payment_accepted,
+        $FFSpec::date
+    ]
+);
+
+$MSpec::fee_paid_resp = $STSM->new(
+    '01', $l->get('Block Patron'), [
+        $FFSpec::card_retained,
         $FFSpec::date
     ]
 );
