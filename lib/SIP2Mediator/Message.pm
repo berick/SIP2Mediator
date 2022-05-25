@@ -111,17 +111,16 @@ sub from_sip {
     $txt = substr($txt, 2);
 
     for my $ffspec (@{$msg->spec->fixed_fields}) {
-
-        unless (defined $txt && length($txt) >= $ffspec->length) {
+        if (defined $txt && length($txt) >= $ffspec->length) {
+            my $value = substr($txt, 0, $ffspec->length);
+            $txt = substr($txt, $ffspec->length);
+            push(@{$msg->fixed_fields},
+                SIP2Mediator::FixedField->new($ffspec, $value));
+        } else {
             syslog('LOG_WARNING', 
-                "Fixed fields do not match spec for code $code.  Discarding");
-            return undef;
+                "Fixed fields do not match spec for code $code and field " . $ffspec->label . ".  Discarding");
+            #return undef;
         }
-
-        my $value = substr($txt, 0, $ffspec->length);
-        $txt = substr($txt, $ffspec->length);
-        push(@{$msg->fixed_fields}, 
-            SIP2Mediator::FixedField->new($ffspec, $value));
     }
 
     # Some messages only have fixed fields.
