@@ -480,7 +480,7 @@ $MSpec::fee_paid_resp = $STSM->new(
     ]
 );
 
-$MSpec::fee_paid_resp = $STSM->new(
+$MSpec::block_patron = $STSM->new(
     '01', $l->get('Block Patron'), [
         $FFSpec::card_retained,
         $FFSpec::date
