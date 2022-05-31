@@ -487,6 +487,19 @@ $MSpec::block_patron = $STSM->new(
     ]
 );
 
+$MSpec::end_patron_session = $STSM->new(
+    '35', $l->get('End Patron Session'), [
+        $FFSpec::date
+    ]
+);
+
+$MSpec::end_patron_session_resp = $STSM->new(
+    '36', $l->get('End Session Response'), [
+        $FFSpec::ok,
+        $FFSpec::date
+    ]
+);
+
 # Custom "end session" message for communicating with the HTTP backend.
 # This differs from "End Patron Session" (35) message in that it's not 
 # about a patron but about a SIP client session, which can involve
