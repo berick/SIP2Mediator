@@ -500,6 +500,11 @@ $MSpec::end_patron_session_resp = $STSM->new(
     ]
 );
 
+$MSpec::request_acs_resend = $STSM->new(
+    '97', $l->get('Request ACS Resend'), [
+    ]
+);
+
 # Custom "end session" message for communicating with the HTTP backend.
 # This differs from "End Patron Session" (35) message in that it's not 
 # about a patron but about a SIP client session, which can involve
