@@ -297,7 +297,11 @@ sub patron_status {
     send_recv({
         code => '23',
         fixed_fields => ['000', SIP2Mediator::Spec->sip_date],
-        fields => [{AO => $institution}, {AA => $patron_barcode}]
+        fields => [
+            {AO => $institution}, 
+            {AA => $patron_barcode},
+            $patron_password ? {AD => $patron_password} : ()
+        ]
     });
 }
 
