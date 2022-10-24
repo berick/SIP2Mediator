@@ -441,9 +441,6 @@ sub listen {
 
     die "Cannot create SIP socket: $!\n" unless $server_socket;
 
-    my $select = IO::Select->new;
-    $select->add($server_socket);
-
     syslog(LOG_INFO => 'Ready for clients...');
 
     # Incremented with each SIP request, decremented with each response
@@ -452,6 +449,11 @@ sub listen {
     my $in_flight = 0;
 
     while (1) {
+
+        my $select = IO::Select->new;
+        $select->add($server_socket);
+        $select->add($_->sip_socket) for values %sip_socket_map;
+        $select->add($_->http_socket) for values %http_socket_map;
 
         if ($shutdown_requested) {
             syslog(LOG_INFO => 'Shutdown requested...');
@@ -503,18 +505,12 @@ sub listen {
                     next;
                 }
 
-                $session =
-                    SIP2Mediator::Server::Session->new($self->config, $client);
-
-                $select->add($client);
-                $select->add($session->http_socket);
+                SIP2Mediator::Server::Session->new($self->config, $client);
 
             } elsif ($session = # new SIP request
                 SIP2Mediator::Server::Session->from_sip_socket($socket)) {
 
                 if ($session->dead || !$session->read_sip_socket) {
-                    $select->remove($session->sip_socket);
-
                     # This will send the 'XS' end-session message
                     # Leave the HTTP socket open until we get the response
                     # from the server.
@@ -528,7 +524,6 @@ sub listen {
                 SIP2Mediator::Server::Session->from_http_socket($socket)) {
 
                 if ($session->dead || !$session->read_http_socket) {
-                    $select->remove($session->http_socket);
                     $session->cleanup_http_socket;
 
                 } else {
@@ -536,11 +531,8 @@ sub listen {
                 }
 
                 if ($session->http_dead) {
-                    # Keepalive timed out.  Create a new connection and
-                    # add it to our select pool.
-                    $select->remove($session->http_socket);
+                    # Keepalive timed out.  Create a new HTTP connection.
                     $session->create_http_socket;
-                    $select->add($session->http_socket);
                 }
             }
         }
